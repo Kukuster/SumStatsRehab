@@ -1,3 +1,4 @@
+# standard library
 import sys
 import re
 from typing import Any, Dict, List, Literal, Tuple, Union
@@ -5,12 +6,13 @@ import os
 import json
 import subprocess
 import time
-import csv
 
+# third-party libraries
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 
+# local
 from validate_utils import write_report_to_dir
 
 

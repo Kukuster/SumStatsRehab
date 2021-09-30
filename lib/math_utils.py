@@ -1,10 +1,8 @@
+# standard library
 from functools import lru_cache
-from math import sqrt as math_sqrt
-from typing import Tuple
 
-import numpy as np
-from numpy import floor as np_floor, ceil as np_ceil
-from scipy.stats import norm as normal_distribution, binom as binomial_distribution # type: ignore
+# third-party libraries
+from scipy.stats import norm as normal_distribution, binom as binomial_distribution # type: ignore # mistakenly, pylance doesn't recognize scipy.stats.norm and scipy.stats.binom
 
 
 @lru_cache(10000)

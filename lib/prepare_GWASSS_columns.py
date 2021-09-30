@@ -1,9 +1,10 @@
+# standard library
 import sys
 from typing import Dict
 import json
 import os
 
-# internal
+# local
 from utils import run_bash
 from file import resolve_bare_text_file
 from standard_column_order import STANDARD_COLUMN_ORDER
@@ -17,7 +18,7 @@ from standard_column_order import STANDARD_COLUMN_ORDER
 
 if len(sys.argv) < 3:  # the very first 0th arg is the name of this script
     print("ERROR: you should specify args:")
-    print("  #1 GWAS summary statistics file in tsv format, that has a corresponding config file (suffixed \".json\") with column indices")
+    print("  #1 GWAS summary statistics file in tsv format (bare, zipped, or gzipped), that has a corresponding config file (suffixed \".json\") with column indices")
     print("  #2 output file name, prepared GWAS summary statistics file with all the columns in the standard order")
     exit(1)
 

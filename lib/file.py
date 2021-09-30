@@ -1,9 +1,11 @@
+# standard library
 from typing import Union, List
 import os
 import shutil
 import gzip
 from zipfile import ZipFile
 
+# third-party libraries
 import requests
 import magic
 

@@ -20,12 +20,12 @@ python3 SSrehab.py "sample/29559693_randlines50000.tsv" "sample/29559693_randlin
 ## NOTES
 
 ### "standard" format
- - file is in tsv format, i.e. tabular tab-separated format
+ - file is in tsv format, i.e. tabular tab-separated format (bare, zipped, or gzipped)
  - there's one-line header in the file on the first line. All other lines are the data entries
  - the file has precisely columns defined as `STANDARD_COLUMN_ORDER` in `lib/standard_column_order.py`.
     - file has exactly these columns, exactly this number of columns, and no other columns
     - columns are in this exact order
-    - if the original file was missing a column, an empty column is taking its place (entries are *the empty string*)
+    - if the original file was missing a column, an empty column should be taking its place (entries are *the empty string*)
 
 
 

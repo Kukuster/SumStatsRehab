@@ -1,11 +1,11 @@
+# standard library
 import sys
-from typing import Dict
-import json
 import os
 from subprocess import call
 import inspect
 import time
 
+# local
 from lib.validate_utils import read_report_from_dir
 
 
@@ -19,7 +19,7 @@ from lib.validate_utils import read_report_from_dir
 
 if len(sys.argv) < 3:  # the very first 0th arg is the name of this script
     print("ERROR: you should specify args:")
-    print("  #1 GWAS summary statistics file in tsv format, that has a corresponding config file (suffixed \".json\") with column indices")
+    print("  #1 GWAS summary statistics file in tsv format (bare, zipped, or gzipped), that has a corresponding config file (suffixed \".json\") with column indices")
     print("  #2 output file name for a fixed file")
     print("  #3 dbSNP file")
     exit(1)
