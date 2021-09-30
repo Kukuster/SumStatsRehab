@@ -212,6 +212,9 @@ def check_row(line_cols: List[str]) -> Union[
         Tuple[float, Literal[2], List[bool]],
     ]:
     """
+    This function runs for EVERY LINE of the input file,
+    which may be MILLIONS OF TIMES per script execution
+
     Returns:
         - a p-value of a SNP,
         - a report of whether a SNP entry is valid,
@@ -658,6 +661,7 @@ for i in range(1, len(invalid_entry_bins)):
 
 if not REPORT_DIR:
     plt.show()
+    input("")
     input("")
 
 
