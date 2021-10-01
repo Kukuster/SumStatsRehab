@@ -124,6 +124,11 @@ elif issues['BP']:
 
 print(f"  Step 3/{numsteps} finished in {(time.time() - start_time)} seconds\n")
 
+if not any(issues.values()):
+    print(f"The input summary statistics file has not been identified to have any issues!")
+    print(f"all {issues['total_entries']} SNPs are good")
+    exit(0)
+
 if required_sorting and ec != 0:
     print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
     exit(13)

@@ -8,7 +8,7 @@ run `SSrehab.py` with `python3`. It accepts 3 arguments:
 
 e.g.:
 ```python
-python3 SSrehab.py "sample/29559693_randlines50000.tsv" "sample/29559693_randlines50000_SSREHUB-FIXED.tsv" "/media/$USER/exFAT_share/SelfDecode/dbSNP151_GRCh37.vcf.gz"
+python3 SSrehab.py "sample/29559693_randlines50000.tsv" "sample/29559693_randlines50000_SSREHAB-FIXED.tsv" "/media/$USER/exFAT_share/SelfDecode/dbSNP151_GRCh37.vcf.gz"
 # this implies that config file exists at: "sample/29559693_randlines50000.tsv.json"
 ```
 
