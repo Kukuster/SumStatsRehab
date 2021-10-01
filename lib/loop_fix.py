@@ -129,7 +129,9 @@ def copy_line(line_i):
 ##### read/write #####
 
 def get_next_line_in_GWASSS():
-    return GWAS_FILE_o.readline().split("\t")
+    line = GWAS_FILE_o.readline()
+    if line == '': raise EOFError('attempt to read beyond the end of GWAS SS file')
+    return line.split("\t")
 
 def write_line_to_GWASSS(fields):
     OUTPUT_GWAS_FILE_o.write("\t".join(fields))
@@ -145,7 +147,7 @@ def read_dbSNPs_data_row(FILE_o: io.TextIOWrapper):
     )
 
 
-##### #####
+##### Math & Stats functions #####
 
 def get_StdErr_from_beta_pval(beta, p):
     z = normal_z_score_two_tailed(p)
@@ -282,12 +284,15 @@ def is_valid_pval(fields):
 These void functions accept the list of fields read from a line and may mutate it
 """
 
-def resolve_rsID(fields, SNPs_FILE_o, SNPs_FILE_line_i):
+def resolve_rsID(fields, SNPs_FILE_o):
     """
     Loops through the SNPs file entries until it finds the current locus
-    Current locus is determined by Chr and BP from the passed `fields`, which is one row of GWAS SS
+    Current locus is defined by Chr and BP from the passed `fields`, which is one row of GWAS SS
 
     Assumes given GWAS SS file is sorted by Chr and BP, in the same way SNPs file is.
+
+    `SNPs_FILE_o`
+        opened SNPs file object
     """
     if not is_valid_rsID(fields) and is_valid_Chr(fields) and is_valid_BP(fields):
         try:
@@ -296,7 +301,7 @@ def resolve_rsID(fields, SNPs_FILE_o, SNPs_FILE_line_i):
 
             while True:
                 chr_snps, bp_snps, rsid = read_dbSNPs_data_row(SNPs_FILE_o)
-                SNPs_FILE_line_i += 1
+                # SNPs_FILE_line_i += 1
 
                 if CHR_ORDER[chr_gwas] == CHR_ORDER[chr_snps]:
                     if bp_snps < bp_gwas:
@@ -316,7 +321,8 @@ def resolve_rsID(fields, SNPs_FILE_o, SNPs_FILE_line_i):
                 # it reached the end of an either file
                 pass
             else:
-                print(f'An error occured on line {SNPs_FILE_line_i} of the dbSNP file (see below)')
+                # print(f'An error occured on line {SNPs_FILE_line_i} of the SNPs file (see below)')
+                print(f'An error occured while looping through the SNPs file (see below)')
                 raise e
 
 
@@ -362,7 +368,7 @@ MAIN_start_time = STEP1_start_time = time.time()
 
 #
 # STEP #1
-#     Assemble a resolver function in accord to present issues
+#     Assemble the full resolver function in accord to present issues
 #
 
 issues = read_report_from_dir(REPORT_DIR)
@@ -373,7 +379,7 @@ if issues['rsID']:
     """
     SNPs_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
     SNPs_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_FILE_o_gz))
-    SNPs_FILE_line_i = 0
+    # SNPs_FILE_line_i = 0
 
     """
     SNPs_FILE, being a VCF file, starts with comment lines at the beginning. Comments start with ##
@@ -385,13 +391,13 @@ if issues['rsID']:
     this prevents putting more conditions into the loop
     """
     SNPs_line = SNPs_FILE_o.readline()
-    SNPs_FILE_line_i += 1
+    # SNPs_FILE_line_i += 1
     while SNPs_line.startswith('##'):
         SNPs_line = SNPs_FILE_o.readline()
-        SNPs_FILE_line_i += 1
+        # SNPs_FILE_line_i += 1
 
     resolvers.append(resolve_rsID)
-    resolvers_args.append([SNPs_FILE_o, SNPs_FILE_line_i])
+    resolvers_args.append([SNPs_FILE_o])
 
 
 if issues['SE']:
