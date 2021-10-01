@@ -536,13 +536,17 @@ ax.tick_params(axis='x', labelsize=9)
 ax.set_xticks(ticks_loc)
 ax.set_xticklabels(x)
 ax.bar(ticks_loc, missing_pval_bins, negative_bars_widths, color='#7f7f7f', align='edge')
-ax.bar(ticks_loc, good_entry_bins, negative_bars_widths, color='#0000ff', align='edge', label="kept SNPs")
-ax.bar(ticks_loc, invalid_entry_bins, negative_bars_widths, color='#ff0000', align='edge', bottom=good_entry_bins, label="discarded SNPs")
+ax.bar(ticks_loc, good_entry_bins, negative_bars_widths, color='#0000ff', align='edge', label="valid SNPs")
+ax.bar(ticks_loc, invalid_entry_bins, negative_bars_widths, color='#ff0000', align='edge', bottom=good_entry_bins, label="invalid SNPs")
 ax.set_xlabel("p-value", fontweight="heavy", fontsize=14)
 ax.set_ylabel("N of SNPs", fontweight="heavy", fontsize=14)
 ax.set_xlim([ticks_loc[0]+negative_bars_widths[0], ticks_loc[-1]])
 
-plt_bottom, plt_top = plt.ylim()
+max_bar_height = max(
+    np.array(missing_pval_bins) + np.array(good_entry_bins) + np.array(invalid_entry_bins) # np arrays add element-wise
+)
+
+plt_bottom, plt_top = ax.set_ylim(0, max_bar_height*1.15 if max_bar_height else 1)
 plt_height = plt_top - plt_bottom
 
 
