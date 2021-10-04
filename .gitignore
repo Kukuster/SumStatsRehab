@@ -29,3 +29,6 @@ __pypackages__/
 /sample/*randlines50000*
 /sample/*randlines1000*
 !/sample/config.example.json
+
+/29559693*/
+

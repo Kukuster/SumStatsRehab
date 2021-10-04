@@ -117,6 +117,10 @@ if issues['rsID']:
            INPUT_GWAS_FILE_standard,
            INPUT_GWAS_FILE_standard_sorted,
            ])
+    if ec != 0:
+        print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
+    else:
+        print(f"sorting finished")
 
 elif issues['BP']:
     # need to sort by rsID
@@ -130,7 +134,6 @@ if not any(issues.values()):
     exit(0)
 
 if required_sorting and ec != 0:
-    print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
     exit(13)
 
 
