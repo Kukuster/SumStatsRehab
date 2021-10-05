@@ -8,6 +8,9 @@ import time
 from math import isnan
 import gzip
 
+# Packages
+from liftover import get_lifter
+
 # local
 from math_utils import normal_p_area_two_tailed, normal_z_score, normal_z_score_two_tailed
 from standard_column_order import STANDARD_COLUMN_ORDER
@@ -342,6 +345,30 @@ def resolve_pval(fields):
             float(fields[cols_i["beta"]]), float(fields[cols_i["SE"]])
         ))
 
+def resolve_chr_pos(fields):
+    """
+    Two mapping files prepared for builds
+    37, and 38. Sorted by rs
+    """
+    pass
+
+def resolve_build(fields, converter):
+    """
+    Will use the input converter dictionary to liftover
+    from the build specified by the user to build38 (with 'chr' prefix)
+    """
+    chr_gwas = fields[cols_i['Chr']]
+    bp_gwas  = int(fields[cols_i['BP']])
+    try:
+        new_chr, new_bp, _ = converter[chr_gwas][bp_gwas]
+        fields[cols_i["Chr"]] = new_chr
+        fields[cols_i["BP"]] = int(new_bp)
+    # if it can't liftover
+    except:
+        fields[cols_i["Chr"]] = '.'
+        fields[cols_i["BP"]] = '.'
+        fields[cols_i["rsID"]] = '.'
+
 
 ##### FULL RESOLVER #####
 """
@@ -366,12 +393,24 @@ def run_all(resolvers, fields, args):
 
 MAIN_start_time = STEP1_start_time = time.time()
 
+current_build = os.getenv('build_num')
+if not current_build == "hg38":
+    converter = get_lifter(os.getenv('build_num'), 'hg38')
+else:
+    converter = None
 #
 # STEP #1
 #     Assemble the full resolver function in accord to present issues
 #
 
+# resolve chr and bp first here
+
 issues = read_report_from_dir(REPORT_DIR)
+if converter:
+    resolvers.append(resolve_build)
+    resolvers_args.append([converter])
+    os.environ['build_num'] = 'hg38'
+
 
 if issues['rsID']:
     """

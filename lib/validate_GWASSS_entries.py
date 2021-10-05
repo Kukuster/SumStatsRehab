@@ -236,7 +236,7 @@ def check_row(line_cols: List[str]) -> Union[
     ### Try getting all columns. If some not present, will throw ###
     try:
         rsid = line_cols[cols_i["rsID"]]
-        chr  = line_cols[cols_i["Chr"]]
+        chrom  = line_cols[cols_i["Chr"]]
         bp   = line_cols[cols_i["BP"]]
         ea   = line_cols[cols_i["EA"]]
         oa   = line_cols[cols_i["OA"]]
@@ -260,7 +260,7 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 2. chromosome
     try:
-        if chr not in CATEGORY_CHR and chr[3:] not in CATEGORY_CHR:
+        if chrom not in CATEGORY_CHR and chrom[3:] not in CATEGORY_CHR:
             issues[INVALID_CHR] = True
     except:
         issues[INVALID_CHR] = True

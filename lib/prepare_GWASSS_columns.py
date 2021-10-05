@@ -84,5 +84,23 @@ BASH_CMD = BASH_CMD + [f">\"{OUTPUT_FILE}\""]
 bash_code = ' '.join(BASH_CMD)
 run_bash(bash_code)
 
+#
+# STEP #3
+#    Remove chr prefix
+
+#TODO: Please remove chr prefix with AWK
+
+bash_code = ' '.join(BASH_CMD)
+run_bash(bash_code)
+
+
+#
+# STEP #4
+#    Assign the build to the env variable using the json input
+#    (You can reorder this step)
+
+#TODO: Please assign the build to either hg19 or hg38
+
+# os.environ['build_num'] = ...
 
 exit(0)
