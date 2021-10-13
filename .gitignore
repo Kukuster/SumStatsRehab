@@ -23,12 +23,12 @@ __pypackages__/
 
 /.vscode
 
-/sample/*.json
 /sample/*asc*
 /sample/*kukrsID*
 /sample/*randlines50000*
 /sample/*randlines1000*
-!/sample/config.example.json
+
+/sample_bak/
 
 /29559693*/
 

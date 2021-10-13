@@ -2,14 +2,14 @@
 import io
 import sys
 import re
-from typing import Dict
+from typing import Dict, Literal
 import os
 import time
 from math import isnan
 import gzip
 
 # local
-from math_utils import normal_p_area_two_tailed, normal_z_score, normal_z_score_two_tailed
+from math_utils import normal_p_area_two_tailed, normal_z_score_two_tailed
 from standard_column_order import STANDARD_COLUMN_ORDER
 from validate_utils import read_report_from_dir
 
@@ -20,12 +20,14 @@ from validate_utils import read_report_from_dir
 #                                                 #
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-if len(sys.argv) < 5:
+if len(sys.argv) < 6:  # the very first 0th arg is the name of this script
     print("ERROR: you should specify args:")
     print("  #1 GWAS summary statistics file in the internal \"standard\" tsv format")
     print("  #2 directory with the report about the GWAS summary statistics file")
     print("  #3 output: filename for GWAS summary statistics with fixes")
-    print("  #4 dbSNP file path")
+    print("  #4 dbSNP file")
+    print("  #5 dbSNP file, sorted by rsID")
+    print("  #6 (optional) Either \"rsID\" or \"ChrBP\". Denotes the sorting of the input GWAS SS file")
     exit(1)
 
 # GWAS_FILE has to be in the internal "standard" tsv format
@@ -33,6 +35,13 @@ GWAS_FILE = sys.argv[1]
 REPORT_DIR = sys.argv[2]
 OUTPUT_GWAS_FILE = sys.argv[3]
 SNPs_FILE = sys.argv[4]
+SNPs_rsID_FILE = sys.argv[5]
+
+GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None
+if len(sys.argv) > 6:
+    GWAS_SORTING = sys.argv[6] if sys.argv[6] in ('rsID', 'ChrBP') else None # type: ignore # pylance doesn't collapse types properly atm
+
+
 
 def file_exists(path: str):
     return os.path.isfile(path)
@@ -58,6 +67,7 @@ cols_i: Dict[str, int] = {STANDARD_COLUMN_ORDER[i]:i for i in range(len(STANDARD
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 NUCLEOTIDES = ['a', 't', 'c', 'g']
+NO_NUCLEOTIDE = '.'
 
 ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS = True
 
@@ -65,47 +75,50 @@ CATEGORY_CHR = [
 '1', '01', '2', '02', '3', '03', '4', '04', '5', '05', '6', '06', '7', '07', '8', '08', '9', '09',
 '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
 '21', '22', '23', 'X', 'x', 'Y', 'y', 'M', 'm']
-CHR_ORDER = {
-    '1':  1,
-    '01': 1,
-    '2':  2,
-    '02': 2,
-    '3':  3,
-    '03': 4,
-    '4':  4,
-    '04': 4,
-    '5':  5,
-    '05': 5,
-    '6':  6,
-    '06': 6,
-    '7':  7,
-    '07': 7,
-    '8':  8,
-    '08': 8,
-    '9':  9,
-    '09': 9,
-    '10': 10,
-    '11': 11,
-    '12': 12,
-    '13': 13,
-    '14': 14,
-    '15': 15,
-    '16': 16,
-    '17': 17,
-    '18': 18,
-    '19': 19,
-    '20': 20,
-    '21': 21,
-    '22': 22,
-    '23': 23,
 
-    'X':  25,
-    'x':  25,
-    'Y':  26,
-    'y':  26,
-    'M':  27,
-    'm':  27,
-}
+class kukdefaultdict(dict):
+    def __missing__(self, key):
+        return key
+CHR_ORDER = kukdefaultdict() # if unknown key was passed, returns the key itself
+CHR_ORDER['1']  = 1
+CHR_ORDER['01'] = 1 #
+CHR_ORDER['2']  = 2
+CHR_ORDER['02'] = 2 #
+CHR_ORDER['3']  = 3
+CHR_ORDER['03'] = 3 #
+CHR_ORDER['4']  = 4
+CHR_ORDER['04'] = 4 #
+CHR_ORDER['5']  = 5
+CHR_ORDER['05'] = 5 #
+CHR_ORDER['6']  = 6
+CHR_ORDER['06'] = 6 #
+CHR_ORDER['7']  = 7
+CHR_ORDER['07'] = 7 #
+CHR_ORDER['8']  = 8
+CHR_ORDER['08'] = 8 #
+CHR_ORDER['9']  = 9
+CHR_ORDER['09'] = 9 #
+CHR_ORDER['10'] = 10
+CHR_ORDER['11'] = 11
+CHR_ORDER['12'] = 12
+CHR_ORDER['13'] = 13
+CHR_ORDER['14'] = 14
+CHR_ORDER['15'] = 15
+CHR_ORDER['16'] = 16
+CHR_ORDER['17'] = 17
+CHR_ORDER['18'] = 18
+CHR_ORDER['19'] = 19
+CHR_ORDER['20'] = 20
+CHR_ORDER['21'] = 21
+CHR_ORDER['22'] = 22
+CHR_ORDER['23'] = 23
+
+CHR_ORDER['X'] =  25
+CHR_ORDER['x'] =  25
+CHR_ORDER['Y'] =  26
+CHR_ORDER['y'] =  26
+CHR_ORDER['M'] =  27
+CHR_ORDER['m'] =  27
 
 
 
@@ -138,17 +151,75 @@ def write_line_to_GWASSS(fields):
 
 
 def read_dbSNPs_data_row(FILE_o: io.TextIOWrapper):
+    """Reads a row from the original dbSNP file"""
     line = FILE_o.readline()
     words = line.split()
     return (
         words[0][3:], # bc in SNPs_file it chromosome number is prepended with "chr"
         int(words[1]), # BP
-        words[2] # rsID
+        words[2], # rsID
+        words[3], # REF
+        words[4]  # ALT
     )
+
+def read_dbSNPs2_data_row(FILE_o: io.TextIOWrapper):
+    """Reads a row from the preprocessed dbSNP file, which is sorted by rsID"""
+    line = FILE_o.readline()
+    words = line.split()
+    return (
+        words[1][3:], # bc in SNPs_file it chromosome number is prepended with "chr"
+        words[2], # BP
+        words[0], # rsID
+        words[3], # REF
+        words[4]  # ALT
+    )
+
+def gt(val1, val2):
+    """
+    A safe "greater than" operator. Accepts int and str for both args.
+
+    It has the following 3 important features:
+      - if both values are numbers (like chromosome order number), it compares numerically
+      - if both values are strings (like unrecognized chromosome numbers), compares alphabetically
+      - if the second value is string (like unrecognized chromosome number), and
+        the first value is number (like chromosome order number),
+        then it assumes the number is always no bigger than the string.
+        This is because (here) "unrecognized" chromosome numbers in dbSNP always go after
+        the common chromosome numbers (known in the CHR_ORDER dictionary).
+
+    With the assumption that the case where the first value is string
+    and the second value is number doesn't occur,
+    this order relation defines a *totally ordered set* which is mathematically defined as:
+    1. First go chromosome numbers defined as keys in CHR_ORDER dictionary,
+    starting with '1' = '01', ordered by the corresponding values in the dictionary.
+    2. After that goes the set of all other strings
+       (the complement set of strings to the set of known chromosome numbers)
+       in the ascending alphabetical order
+
+    This matches the way GWAS SS is sorted by Chr and BP here.
+    """
+    try:
+        return val1 > val2
+    except:
+        return False
 
 
 ##### Math & Stats functions #####
 
+"""
+These functions resolve each of the three values (p-value, beta, standard error) from the other two
+
+                    s = b/z,
+where:
+    s - standard error,
+    b - beta-value,
+    z - the normal z-score that corresponds to the p-value
+
+e.g. for the two-tailed test (which is used in GWAS):
+                z = qnorm(1 - p/2),
+where:
+    qnorm - inverse cumulative function for normal distribution
+"""
 def get_StdErr_from_beta_pval(beta, p):
     z = normal_z_score_two_tailed(p)
     return abs(beta)/z
@@ -164,7 +235,9 @@ def get_pval_from_beta_StdErr(beta, se):
 
 ##### Field validators #####
 """
-These boolean functions accept the list of fields read from a line
+These boolean functions:
+    accept the list of fields read from a line;
+    return a boolean value answering whether or not a particular field in a row is valid or not
 """
 
 def is_valid_rsID(fields):
@@ -197,6 +270,10 @@ def is_valid_BP(fields):
 def is_valid_EA_allowMNP(fields):
     try:
         ea = fields[cols_i["EA"]]
+        if ea == '':
+            return False
+        if ea == NO_NUCLEOTIDE:
+            return True
         for char in ea.lower():
             if char not in NUCLEOTIDES:
                 return False
@@ -207,6 +284,10 @@ def is_valid_EA_allowMNP(fields):
 def is_valid_OA_allowMNP(fields):
     try:
         oa = fields[cols_i["OA"]]
+        if oa == '':
+            return False
+        if oa == NO_NUCLEOTIDE:
+            return True
         for char in oa.lower():
             if char not in NUCLEOTIDES:
                 return False
@@ -217,6 +298,10 @@ def is_valid_OA_allowMNP(fields):
 def is_valid_EA_dontallowMNP(fields):
     try:
         ea = fields[cols_i["EA"]]
+        if ea == '':
+            return False
+        if ea == NO_NUCLEOTIDE:
+            return True
         if ea.lower() not in NUCLEOTIDES:
             return False
     except:
@@ -226,6 +311,10 @@ def is_valid_EA_dontallowMNP(fields):
 def is_valid_OA_dontallowMNP(fields):
     try:
         oa = fields[cols_i["OA"]]
+        if oa == '':
+            return False
+        if oa == NO_NUCLEOTIDE:
+            return True
         if oa.lower() not in NUCLEOTIDES:
             return False
     except:
@@ -279,28 +368,68 @@ def is_valid_pval(fields):
     return True
 
 
+
+##### RESOLVERS helpers #####
+"""
+These void functions accept the list of fields read from a line and may mutate it
+
+`fields`: list[str]
+    list of entries in a row
+"""
+
+def resolve_allele(fields, REF, ALT):
+    """
+    Runs iff exactly one allele entry is missing.
+    Depending on the REF and ALT (from the dbSNP), decides which one is the allele that's present,
+    and restores the other one in accord.
+    """
+    if   is_valid_EA(fields) and not is_valid_OA(fields):
+        MA = 'OA'  # missing allele
+        PA = 'EA'  # present allele
+    elif is_valid_OA(fields) and not is_valid_EA(fields):
+        MA = 'EA'  # missing allele
+        PA = 'OA'  # present allele
+    else:
+        return
+
+    PA_val = fields[cols_i[PA]]
+
+    if PA_val == REF:
+        fields[cols_i[MA]] = ALT.split(',')[0]
+        return
+    for a in ALT.split(','):
+        if PA_val == a:
+            fields[cols_i[MA]] = REF
+            return
+
 ##### RESOLVERS #####
 """
 These void functions accept the list of fields read from a line and may mutate it
+
+`fields`: list[str]
+    list of entries in a row
 """
 
 def resolve_rsID(fields, SNPs_FILE_o):
     """
-    Loops through the SNPs file entries until it finds the current locus
-    Current locus is defined by Chr and BP from the passed `fields`, which is one row of GWAS SS
+    Loops through the SNPs file entries until it finds the current SNP in GWAS SS file
+    Current SNP is defined by Chr and BP from the passed `fields`, which is one row of GWAS SS
+    Therefore, rsID is restored by Chr and BP, which won't always work for biallelic sites
 
     Assumes given GWAS SS file is sorted by Chr and BP, in the same way SNPs file is.
 
     `SNPs_FILE_o`
         opened SNPs file object
     """
-    if not is_valid_rsID(fields) and is_valid_Chr(fields) and is_valid_BP(fields):
+    if is_valid_Chr(fields) and is_valid_BP(fields) and not all([
+        is_valid_rsID(fields), is_valid_OA(fields), is_valid_EA(fields)
+    ]):
         try:
             chr_gwas = fields[cols_i['Chr']]
             bp_gwas  = int(fields[cols_i['BP']])
 
             while True:
-                chr_snps, bp_snps, rsid = read_dbSNPs_data_row(SNPs_FILE_o)
+                chr_snps, bp_snps, rsid, ref, alt = read_dbSNPs_data_row(SNPs_FILE_o)
                 # SNPs_FILE_line_i += 1
 
                 if CHR_ORDER[chr_gwas] == CHR_ORDER[chr_snps]:
@@ -308,12 +437,55 @@ def resolve_rsID(fields, SNPs_FILE_o):
                         continue
                     elif bp_gwas == bp_snps:
                         fields[cols_i['rsID']] = rsid
+                        resolve_allele(fields, ref, alt)
                         break # after this a new line of GWAS SS should be read and index incremented
                     else: #bp_snps > bp_gwas:
                         fields[cols_i['rsID']] = '.'
                         break # after this a new line of GWAS SS should be read and index incremented
-                elif CHR_ORDER[chr_snps] > CHR_ORDER[chr_gwas]:
+                elif gt(CHR_ORDER[chr_snps], CHR_ORDER[chr_gwas]):
                     fields[cols_i['rsID']] = '.'
+                    break # after this a new line of GWAS SS should be read and index incremented
+
+        except Exception as e:
+            if isinstance(e, IndexError) or isinstance(e, EOFError):
+                # it reached the end of an either file
+                pass
+            else:
+                # print(f'An error occured on line {SNPs_FILE_line_i} of the SNPs file (see below)')
+                print(f'An error occured while looping through the SNPs file (see below)')
+                raise e
+
+
+def resolve_ChrBP(fields, SNPs_rsID_FILE_o):
+    """
+    Loops through the SNPs file entries until it finds the current locus
+    Current locus is defined by rsID from the passed `fields`, which is one row of GWAS SS
+
+    Assumes given GWAS SS file is sorted by rsID, in the same way this processed SNPs file is.
+
+    `SNPs_rsID_FILE_o`
+        opened SNPs file object
+    """
+    if is_valid_rsID(fields) and not all([
+        is_valid_Chr(fields), is_valid_BP(fields), is_valid_OA(fields), is_valid_EA(fields)
+    ]):
+        try:
+            rsID_gwas = fields[cols_i['rsID']]
+
+            while True:
+                chr_snps, bp_snps, rsid, ref, alt = read_dbSNPs2_data_row(SNPs_rsID_FILE_o)
+                # SNPs_FILE_line_i += 1
+
+                if rsid < rsID_gwas:
+                    continue
+                elif rsID_gwas == rsid:
+                    fields[cols_i['Chr']] = chr_snps
+                    fields[cols_i['BP']] = bp_snps
+                    resolve_allele(fields, ref, alt)
+                    break # after this a new line of GWAS SS should be read and index incremented
+                else: #rsid > bp_gwas:
+                    fields[cols_i['Chr']] = '.'
+                    fields[cols_i['BP']] = '.'
                     break # after this a new line of GWAS SS should be read and index incremented
 
         except Exception as e:
@@ -345,12 +517,12 @@ def resolve_pval(fields):
 
 ##### FULL RESOLVER #####
 """
-This function will be called for each row.
-It calls resolvers one by one from the list of resolvers (hope this helps)
+This function will be called for each row of the input GWAS SS file
+It calls resolvers one by one from the list of resolvers.
+Each resolver attempts to resolve one or many values for the given row.
 """
-resolve_fields = None
-resolvers = []
-resolvers_args = []
+resolvers = [] # list of functions
+resolvers_args = [] # list of lists of arguments for these functions
 
 def run_all(resolvers, fields, args):
     for res_i in range(len(resolvers)):
@@ -368,14 +540,22 @@ MAIN_start_time = STEP1_start_time = time.time()
 
 #
 # STEP #1
-#     Assemble the full resolver function in accord to present issues
+#     Assemble the full resolver function in accord to present issues.
+#
+#     E.g.:
+#       - if all values from a pacticular column are valid,
+#         there's no need to add a resolver function for it.
+#       - if all values from a particular column are invalid,
+#         there's no need to add a resolver for another column that depends on the first,
+#         as it would always run uselessly
+#
 #
 
-issues = read_report_from_dir(REPORT_DIR)
+issues, total_entries = read_report_from_dir(REPORT_DIR)
 
-if issues['rsID']:
+if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA']):
     """
-    This rsID resolver assumes GWAS SS file is sorted by Chr and BP in accord to the SNPs file
+    These resolvers assumes GWAS SS file is sorted by Chr and BP in accord to the SNPs file
     """
     SNPs_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
     SNPs_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_FILE_o_gz))
@@ -396,19 +576,32 @@ if issues['rsID']:
         SNPs_line = SNPs_FILE_o.readline()
         # SNPs_FILE_line_i += 1
 
-    resolvers.append(resolve_rsID)
-    resolvers_args.append([SNPs_FILE_o])
+    if issues['rsID']:
+        resolvers.append(resolve_rsID)
+        resolvers_args.append([SNPs_FILE_o])
+
+if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA']):
+    """
+    This ChrBP resolver assumes GWAS SS file is sorted by rsID
+    """
+    # open files here
+    SNPs_rsID_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_rsID_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
+    SNPs_rsID_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_rsID_FILE_o_gz))
+
+    if issues['Chr'] or issues['BP']:
+        resolvers.append(resolve_ChrBP)
+        resolvers_args.append([SNPs_rsID_FILE_o])
 
 
-if issues['SE']:
+if issues['SE'] and issues['beta']<total_entries and issues['pval']<total_entries:
     resolvers.append(resolve_SE)
     resolvers_args.append([])
 
-if issues['beta']:
+if issues['beta'] and issues['SE']<total_entries and issues['pval']<total_entries:
     resolvers.append(resolve_beta)
     resolvers_args.append([])
 
-if issues['pval']:
+if issues['pval'] and issues['beta']<total_entries and issues['SE']<total_entries:
     resolvers.append(resolve_pval)
     resolvers_args.append([])
 
