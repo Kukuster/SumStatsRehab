@@ -4,7 +4,8 @@
 run `SSrehab.py` with `python3`. It accepts 3 arguments:
  1. Path to GWAS summary statistics file in tsv format, that has a corresponding config file (suffixed \".json\") with column indices. Use `sample/29559693.tsv.gz.json` as a template. No columns are required to specify. If you don't specify a column, `SSrehab` will attempt to fully restore it, when possible.
  2. Path to the output fixed GWAS SS file
- 3. Path to a dbSNP file that corresponds to the input GWAS SS file
+ 3. Path to a dbSNP file of build that corresponds to the input GWAS SS file
+ 4. Path to a dbSNP file of build that corresponds to the input GWAS SS file, previously sorted by rsID using `lib/sort_SNPs_by_rsID.py`
 
 e.g.:
 ```python
