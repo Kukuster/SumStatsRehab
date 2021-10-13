@@ -161,6 +161,7 @@ ISSUES_COLORS=[
 ]
 
 NUCLEOTIDES = ['a', 't', 'c', 'g']
+NO_NUCLEOTIDE = '.'
 
 ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS = True
 
@@ -275,7 +276,11 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 4. effect allele
     try:
-        if ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
+        if ea == '':
+            issues[INVALID_EA] = True
+        elif ea == NO_NUCLEOTIDE:
+            issues[INVALID_EA] = False
+        elif ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
             for char in ea.lower():
                 if char not in NUCLEOTIDES:
                     issues[INVALID_EA] = True
@@ -287,7 +292,11 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 5. other allele
     try:
-        if ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
+        if oa == '':
+            issues[INVALID_OA] = True
+        elif oa == NO_NUCLEOTIDE:
+            issues[INVALID_OA] = False
+        elif ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
             for char in oa.lower():
                 if char not in NUCLEOTIDES:
                     issues[INVALID_OA] = True
@@ -367,7 +376,7 @@ SNPs_issues = np.empty((num_of_snps, len(ISSUES)), dtype=bool)
 try:
     snp_i = 0
     while True:
-        SNPs_pval[snp_i], SNPs_report[snp_i], SNPs_issues[snp_i] = check_row(GWAS_FILE_o.readline().strip().split(separator))
+        SNPs_pval[snp_i], SNPs_report[snp_i], SNPs_issues[snp_i] = check_row(GWAS_FILE_o.readline().replace('\n','').split(separator))
         snp_i += 1
 
 except Exception as e:

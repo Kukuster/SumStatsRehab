@@ -71,8 +71,14 @@ for i in range(len(STANDARD_COLUMN_ORDER)):
     if col_name in cols_i.keys():
         # user specifies column indices as starting with 0,
         # whereas Unix cut(1) counts columns starting with 1
-        current_col_index = cols_i[col_name] + 1
-        BASH_CMD.append(f"<(cut -d$'\\t' -f{current_col_index} \"{BARE_GWAS_FILE}\")")
+        c_i = current_col_index = cols_i[col_name] + 1
+
+        # for any relevant column that's present, cut it.
+        # if this is a chromosome column, make sure there's no "chr" prefix
+        if col_name == 'Chr':
+            BASH_CMD.append(f"<(awk -F $'\\t' '{{if (${c_i} ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' < \"{BARE_GWAS_FILE}\")")
+        else:
+            BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
     else:
         # if user didn't specify index for the column, a template column is added (header only)
         # in this case, paste(1) will leave such columns empty, i.e. values are the empty string
