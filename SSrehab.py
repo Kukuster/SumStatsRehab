@@ -4,11 +4,13 @@ import os
 from subprocess import call
 import inspect
 import time
-from typing import Literal
-from lib.standard_column_order import STANDARD_COLUMN_ORDER
+from typing import Dict, Literal, Union
+import json
 
 # local
 from lib.validate_utils import read_report_from_dir
+from lib.standard_column_order import STANDARD_COLUMN_ORDER
+from lib.env import get_build, set_build
 
 
 
@@ -25,6 +27,7 @@ if len(sys.argv) < 4:  # the very first 0th arg is the name of this script
     print("  #2 output file name for a fixed file")
     print("  #3 dbSNP file")
     print("  #4 dbSNP file sorted by rsID")
+    print("  #5 (optional) chain file")
     exit(1)
 
 # INPUT_GWAS_FILE has to be in a tabular tab-sep format with a header on the first line
@@ -33,6 +36,11 @@ JSON_CONFIG = sys.argv[1] + '.json'
 OUTPUT_FILE = sys.argv[2]
 dbSNP_FILE = sys.argv[3]
 dbSNP2_FILE = sys.argv[4]
+
+CHAIN_FILE: Union[str, None] = None
+if len(sys.argv) > 5:
+    CHAIN_FILE = sys.argv[5]
+
 
 if not os.path.isfile(INPUT_GWAS_FILE):
     print(f"ERROR: provided GWAS SS file doesn't exist: {INPUT_GWAS_FILE}")
@@ -49,6 +57,9 @@ if not os.path.isfile(dbSNP_FILE):
 if not os.path.isfile(dbSNP2_FILE):
     print(f"ERROR: there's no preprocessed dbSNP file at the path: {dbSNP2_FILE}")
     exit(2)
+
+if CHAIN_FILE and not os.path.isfile(CHAIN_FILE):
+    print(f"ERROR: there's no chain file at the path: {CHAIN_FILE}")
 
 
 # define paths to libs
@@ -70,6 +81,17 @@ def remove_last_ext(filename: str):
 #                      MAIN                       #
 #                                                 #
 # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+### Set the environment varaible for the build ###
+config: Dict[str, Union[int, str]] = json.load(open(JSON_CONFIG,))
+try:
+    input_build = config['build']
+except:
+    raise ValueError('config file that corresponds to the GWAS SS file has to have "build" key set')
+set_build(input_build)
+print(f'build of the GWAS SS file: {get_build()}')
+
 
 i_step = 0
 
@@ -184,6 +206,7 @@ ec = call(["python3",
            REHAB_OUTPUT_FILE,
            dbSNP_FILE,
            dbSNP2_FILE,
+           CHAIN_FILE if CHAIN_FILE else 'None',
            sorted_by if sorted_by else ''
            ])
 print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
@@ -225,7 +248,10 @@ issues_REHABed, total_entries = read_report_from_dir(REHABed_validation_report_d
 issues_solved = {c: issues[c]-issues_REHABed[c] for c in issues}
 for col in STANDARD_COLUMN_ORDER:
     if col not in ('N', 'INFO') and issues_solved[col]:
-        print(f"restored {issues_solved[col]} entries for \"{col}\" column")
+        if issues_solved[col] < 0 and col in ('Chr', 'BP') and get_build() != input_build:
+            print(f"lost {issues_solved[col]} entries for \"{col}\" column after liftover")
+        else:
+            print(f"restored {issues_solved[col]} entries for \"{col}\" column")
 
 INPUT_GWAS_FILE_standard_sorted2 = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted2.tsv"
 
@@ -277,6 +303,7 @@ ec = call(["python3",
            REHAB2_OUTPUT_FILE,
            dbSNP_FILE,
            dbSNP2_FILE,
+           CHAIN_FILE if CHAIN_FILE else 'None',
            sorted_by if sorted_by else ''
            ])
 print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
@@ -318,7 +345,10 @@ issues_REHABed_twice, total_entries = read_report_from_dir(REHABed_twice_validat
 issues_solved = {c: issues[c]-issues_REHABed_twice[c] for c in issues}
 for col in STANDARD_COLUMN_ORDER:
     if col not in ('N', 'INFO') and issues_solved[col]:
-        print(f"restored {issues_solved[col]} entries for \"{col}\" column")
+        if issues_solved[col] < 0 and col in ('Chr', 'BP') and get_build() != input_build:
+            print(f"lost {issues_solved[col]} entries for \"{col}\" column after liftover")
+        else:
+            print(f"restored {issues_solved[col]} entries for \"{col}\" column")
 
 
 print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")

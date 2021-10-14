@@ -8,10 +8,14 @@ import time
 from math import isnan
 import gzip
 
+# third-party libraries
+from liftover import ChainFile as get_lifter_from_ChainFile # type: ignore # pylance mistakenly doesn't recognize ChainFile
+
 # local
 from math_utils import normal_p_area_two_tailed, normal_z_score_two_tailed
 from standard_column_order import STANDARD_COLUMN_ORDER
 from validate_utils import read_report_from_dir
+from env import GWASSS_BUILD_NUMBER_ENV, get_build, set_build
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -20,14 +24,15 @@ from validate_utils import read_report_from_dir
 #                                                 #
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-if len(sys.argv) < 6:  # the very first 0th arg is the name of this script
+if len(sys.argv) < 7:  # the very first 0th arg is the name of this script
     print("ERROR: you should specify args:")
     print("  #1 GWAS summary statistics file in the internal \"standard\" tsv format")
     print("  #2 directory with the report about the GWAS summary statistics file")
     print("  #3 output: filename for GWAS summary statistics with fixes")
     print("  #4 dbSNP file")
     print("  #5 dbSNP file, sorted by rsID")
-    print("  #6 (optional) Either \"rsID\" or \"ChrBP\". Denotes the sorting of the input GWAS SS file")
+    print("  #6 chain file for liftover from build 36 or 37 to build 38, or \"None\"")
+    print("  #7 (optional) Either \"rsID\" or \"ChrBP\". Denotes the sorting of the input GWAS SS file")
     exit(1)
 
 # GWAS_FILE has to be in the internal "standard" tsv format
@@ -36,10 +41,11 @@ REPORT_DIR = sys.argv[2]
 OUTPUT_GWAS_FILE = sys.argv[3]
 SNPs_FILE = sys.argv[4]
 SNPs_rsID_FILE = sys.argv[5]
+CHAIN_FILE = sys.argv[6]
 
 GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None
-if len(sys.argv) > 6:
-    GWAS_SORTING = sys.argv[6] if sys.argv[6] in ('rsID', 'ChrBP') else None # type: ignore # pylance doesn't collapse types properly atm
+if len(sys.argv) > 7:
+    GWAS_SORTING = sys.argv[7] if sys.argv[7] in ('rsID', 'ChrBP') else None # type: ignore # pylance doesn't collapse types properly atm
 
 
 
@@ -120,6 +126,46 @@ CHR_ORDER['y'] =  26
 CHR_ORDER['M'] =  27
 CHR_ORDER['m'] =  27
 
+CHR_LIFTOVER = kukdefaultdict() 
+CHR_LIFTOVER['1']  = '1'
+CHR_LIFTOVER['01'] = '1' #
+CHR_LIFTOVER['2']  = '2'
+CHR_LIFTOVER['02'] = '2' #
+CHR_LIFTOVER['3']  = '3'
+CHR_LIFTOVER['03'] = '3' #
+CHR_LIFTOVER['4']  = '4'
+CHR_LIFTOVER['04'] = '4' #
+CHR_LIFTOVER['5']  = '5'
+CHR_LIFTOVER['05'] = '5' #
+CHR_LIFTOVER['6']  = '6'
+CHR_LIFTOVER['06'] = '6' #
+CHR_LIFTOVER['7']  = '7'
+CHR_LIFTOVER['07'] = '7' #
+CHR_LIFTOVER['8']  = '8'
+CHR_LIFTOVER['08'] = '8' #
+CHR_LIFTOVER['9']  = '9'
+CHR_LIFTOVER['09'] = '9' #
+CHR_LIFTOVER['10'] = '10'
+CHR_LIFTOVER['11'] = '11'
+CHR_LIFTOVER['12'] = '12'
+CHR_LIFTOVER['13'] = '13'
+CHR_LIFTOVER['14'] = '14'
+CHR_LIFTOVER['15'] = '15'
+CHR_LIFTOVER['16'] = '16'
+CHR_LIFTOVER['17'] = '17'
+CHR_LIFTOVER['18'] = '18'
+CHR_LIFTOVER['19'] = '19'
+CHR_LIFTOVER['20'] = '20'
+CHR_LIFTOVER['21'] = '21'
+CHR_LIFTOVER['22'] = '22'
+CHR_LIFTOVER['23'] = '23'
+
+CHR_LIFTOVER['X'] =  'X'
+CHR_LIFTOVER['x'] =  'X'
+CHR_LIFTOVER['Y'] =  'Y'
+CHR_LIFTOVER['y'] =  'Y'
+CHR_LIFTOVER['M'] =  'M'
+CHR_LIFTOVER['m'] =  'M'
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -410,6 +456,24 @@ These void functions accept the list of fields read from a line and may mutate i
     list of entries in a row
 """
 
+def resolve_build38(fields, converter):
+    """
+    Will use the input converter dictionary to liftover
+    from the build specified by the user to build38 (with 'chr' prefix)
+    """
+    chr_gwas = CHR_LIFTOVER[fields[cols_i['Chr']]]
+    bp_gwas  = int(fields[cols_i['BP']])
+    try:
+        new_chr, new_bp, _ = converter[chr_gwas][bp_gwas][0]
+        fields[cols_i["Chr"]] = new_chr.replace('chr', '')
+        fields[cols_i["BP"]] = str(new_bp)
+    # if it can't liftover
+    except:
+        fields[cols_i["Chr"]] = '.'
+        fields[cols_i["BP"]] = '.'
+        fields[cols_i["rsID"]] = '.'
+
+
 def resolve_rsID(fields, SNPs_FILE_o):
     """
     Loops through the SNPs file entries until it finds the current SNP in GWAS SS file
@@ -520,6 +584,9 @@ def resolve_pval(fields):
 This function will be called for each row of the input GWAS SS file
 It calls resolvers one by one from the list of resolvers.
 Each resolver attempts to resolve one or many values for the given row.
+
+Each resolver has `fields: list[str]` as the first argument,
+and may have other args defined as a list under the corresponding index in `resolvers_args` list
 """
 resolvers = [] # list of functions
 resolvers_args = [] # list of lists of arguments for these functions
@@ -552,6 +619,15 @@ MAIN_start_time = STEP1_start_time = time.time()
 #
 
 issues, total_entries = read_report_from_dir(REPORT_DIR)
+
+current_build = get_build()
+converter = None
+if current_build != 'hg38' and file_exists(CHAIN_FILE):
+    converter = get_lifter_from_ChainFile(CHAIN_FILE, current_build, 'hg38')
+    set_build('hg38')
+    resolvers.append(resolve_build38)
+    resolvers_args.append([converter])
+
 
 if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA']):
     """

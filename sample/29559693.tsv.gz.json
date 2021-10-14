@@ -9,5 +9,7 @@
     "SE": 8,
     "pval": 9,
     "N": 10,
-    "INFO": 4
+    "INFO": 4,
+
+    "build": "grch37"
 }
