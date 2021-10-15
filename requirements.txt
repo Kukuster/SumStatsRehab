@@ -1,0 +1,6 @@
+numpy==1.20.1
+matplotlib==3.3.4
+scipy==1.6.1
+liftover==1.1.11
+python-magic==0.4.24
+requests==2.22.0
