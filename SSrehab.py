@@ -442,6 +442,7 @@ def prepare_dbSNPs(SNPs_FILE: str, OUTPUT_FILE: str, gzsort: str, bcftools: str,
     ### RUN ###
     ec = call(["python3",
             prepare_two_dbSNPs,
+            SNPs_FILE,
             gzsort,
             bcftools,
             buffer_size,
