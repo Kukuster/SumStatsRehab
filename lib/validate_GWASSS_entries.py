@@ -36,7 +36,7 @@ JSON_CONFIG = sys.argv[2]
 
 REPORT_DIR = None
 REPORT_ABS_DIR = None
-if len(sys.argv) > 3:
+if len(sys.argv) > 3 and sys.argv[3]:
     REPORT_DIR = sys.argv[3]
     REPORT_ABS_DIR = os.path.abspath(REPORT_DIR)
 
@@ -578,7 +578,7 @@ proportion_of_invalid_entries_bins = [0.] + [
                 for i in range(1, len(good_entry_bins))]
 
 percentage_of_invalid_entries_bins = np.round(np.array(proportion_of_invalid_entries_bins)*100).astype(int)
-percentage_of_invalid_entries_bins_str = np.char.array(percentage_of_invalid_entries_bins) + "%"
+percentage_of_invalid_entries_bins_str = np.char.array(percentage_of_invalid_entries_bins) + "%" # type: ignore # pylance mistakenly doesn't recognize np.char
 
 
 

@@ -24,15 +24,16 @@ from env import GWASSS_BUILD_NUMBER_ENV, get_build, set_build
 #                                                 #
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-if len(sys.argv) < 7:  # the very first 0th arg is the name of this script
+if len(sys.argv) < 8:  # the very first 0th arg is the name of this script
     print("ERROR: you should specify args:")
     print("  #1 GWAS summary statistics file in the internal \"standard\" tsv format")
     print("  #2 directory with the report about the GWAS summary statistics file")
-    print("  #3 output: filename for GWAS summary statistics with fixes")
-    print("  #4 dbSNP file")
-    print("  #5 dbSNP file, sorted by rsID")
+    print("  #3 OUTPUT: filename for GWAS summary statistics with fixes")
+    print("  #4 preprocessed dbSNP1 file, or \"None\"")
+    print("  #5 preprocessed dbSNP2 file, or \"None\"")
     print("  #6 chain file for liftover from build 36 or 37 to build 38, or \"None\"")
-    print("  #7 (optional) Either \"rsID\" or \"ChrBP\". Denotes the sorting of the input GWAS SS file")
+    print("  #7 frequency database slug (e.g.: \"GnomAD\", \"dbGaP_PopFreq\", \"TOMMO\"), or \"None\"")
+    print("  #8 (optional) Either \"rsID\" or \"ChrBP\". Denotes the sorting of the input GWAS SS file")
     exit(1)
 
 # GWAS_FILE has to be in the internal "standard" tsv format
@@ -42,10 +43,11 @@ OUTPUT_GWAS_FILE = sys.argv[3]
 SNPs_FILE = sys.argv[4]
 SNPs_rsID_FILE = sys.argv[5]
 CHAIN_FILE = sys.argv[6]
+FREQ_DATABASE_SLUG = sys.argv[7] if sys.argv[7] != 'None' else None
 
 GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None
-if len(sys.argv) > 7:
-    GWAS_SORTING = sys.argv[7] if sys.argv[7] in ('rsID', 'ChrBP') else None # type: ignore # pylance doesn't collapse types properly atm
+if len(sys.argv) > 8:
+    GWAS_SORTING = sys.argv[8] if sys.argv[8] in ('rsID', 'ChrBP') else None # type: ignore # pylance doesn't collapse types properly atm
 
 
 
@@ -196,28 +198,30 @@ def write_line_to_GWASSS(fields):
     OUTPUT_GWAS_FILE_o.write("\t".join(fields))
 
 
-def read_dbSNPs_data_row(FILE_o: io.TextIOWrapper):
-    """Reads a row from the original dbSNP file"""
+def read_dbSNP1_data_row(FILE_o: io.TextIOWrapper):
+    """Reads a row from the preprocessed dbSNP file 1"""
     line = FILE_o.readline()
     words = line.split()
     return (
-        words[0][3:], # bc in SNPs_file it chromosome number is prepended with "chr"
+        words[0], # Chr
         int(words[1]), # BP
         words[2], # rsID
         words[3], # REF
-        words[4]  # ALT
+        words[4], # ALT
+        words[5], # freq
     )
 
-def read_dbSNPs2_data_row(FILE_o: io.TextIOWrapper):
-    """Reads a row from the preprocessed dbSNP file, which is sorted by rsID"""
+def read_dbSNP2_data_row(FILE_o: io.TextIOWrapper):
+    """Reads a row from the preprocessed dbSNP file 2 (which is sorted by rsID)"""
     line = FILE_o.readline()
     words = line.split()
     return (
-        words[1][3:], # bc in SNPs_file it chromosome number is prepended with "chr"
+        words[1], # Chr
         words[2], # BP
         words[0], # rsID
         words[3], # REF
-        words[4]  # ALT
+        words[4], # ALT
+        words[5], # freq
     )
 
 def gt(val1, val2):
@@ -448,6 +452,43 @@ def resolve_allele(fields, REF, ALT):
             fields[cols_i[MA]] = REF
             return
 
+
+def resolve_EAF(fields, REF, ALT, SNP_freq_field):
+    """
+    1. Tries to find the allele by exact match in REF or ALT;
+    2. Checks if frequency entry from the given database slug is present;
+    3. Takes the allele frequency for the corresponding allele
+    """
+
+    """
+    example value for `SNP_freq_field`:
+        "freq=1000Genomes:0.9988,.,0.001198|GnomAD:0.9943,0.005747,."
+
+    This describes allele frequencies for 3 alleles,
+    from 2 databases: 1000Genomes, GnomAD
+
+    Having 3 alleles, means an allele in REF field and two alleles in ALT separated with comma.
+    For this example, REF and ALT values are the following:
+        "TA"
+        "T,TAA"
+    and `FREQ_DATABASE_SLUG`:
+        "GnomAD"
+    """
+
+    if not is_valid_EAF(fields) and is_valid_EA(fields):
+        try:
+            freqs = SNP_freq_field.replace('freq=','').replace('|',':').split(':') # ["1000Genomes", "0.9988,.,0.001198", "GnomAD", "0.9943,0.005747,."]
+            alleles = (REF+','+ALT).split(',') # ["TA", "T", "TAA"]
+            EA = fields[cols_i['EA']] # "T"
+
+            the_freq_db_i = freqs.index(FREQ_DATABASE_SLUG) # "2"
+            SNP_freqs = freqs[the_freq_db_i+1].split(',') # ["0.9943", "0.005747", "."]
+            allele_i = alleles.index(EA) # 1
+            fields[cols_i['EAF']] = SNP_freqs[allele_i]  # "0.005747"
+        except:
+            fields[cols_i['EAF']] = '.'
+
+
 ##### RESOLVERS #####
 """
 These void functions accept the list of fields read from a line and may mutate it
@@ -486,14 +527,16 @@ def resolve_rsID(fields, SNPs_FILE_o):
         opened SNPs file object
     """
     if is_valid_Chr(fields) and is_valid_BP(fields) and not all([
-        is_valid_rsID(fields), is_valid_OA(fields), is_valid_EA(fields)
+        is_valid_rsID(fields),
+        is_valid_OA(fields), is_valid_EA(fields),
+        is_valid_EAF(fields),
     ]):
         try:
             chr_gwas = fields[cols_i['Chr']]
             bp_gwas  = int(fields[cols_i['BP']])
 
             while True:
-                chr_snps, bp_snps, rsid, ref, alt = read_dbSNPs_data_row(SNPs_FILE_o)
+                chr_snps, bp_snps, rsid, ref, alt, freq = read_dbSNP1_data_row(SNPs_FILE_o)
                 # SNPs_FILE_line_i += 1
 
                 if CHR_ORDER[chr_gwas] == CHR_ORDER[chr_snps]:
@@ -502,6 +545,7 @@ def resolve_rsID(fields, SNPs_FILE_o):
                     elif bp_gwas == bp_snps:
                         fields[cols_i['rsID']] = rsid
                         resolve_allele(fields, ref, alt)
+                        resolve_EAF(fields, ref, alt, freq)
                         break # after this a new line of GWAS SS should be read and index incremented
                     else: #bp_snps > bp_gwas:
                         fields[cols_i['rsID']] = '.'
@@ -531,13 +575,15 @@ def resolve_ChrBP(fields, SNPs_rsID_FILE_o):
         opened SNPs file object
     """
     if is_valid_rsID(fields) and not all([
-        is_valid_Chr(fields), is_valid_BP(fields), is_valid_OA(fields), is_valid_EA(fields)
+        is_valid_Chr(fields), is_valid_BP(fields),
+        is_valid_OA(fields), is_valid_EA(fields),
+        is_valid_EAF(fields),
     ]):
         try:
             rsID_gwas = fields[cols_i['rsID']]
 
             while True:
-                chr_snps, bp_snps, rsid, ref, alt = read_dbSNPs2_data_row(SNPs_rsID_FILE_o)
+                chr_snps, bp_snps, rsid, ref, alt, freq = read_dbSNP2_data_row(SNPs_rsID_FILE_o)
                 # SNPs_FILE_line_i += 1
 
                 if rsid < rsID_gwas:
@@ -546,6 +592,7 @@ def resolve_ChrBP(fields, SNPs_rsID_FILE_o):
                     fields[cols_i['Chr']] = chr_snps
                     fields[cols_i['BP']] = bp_snps
                     resolve_allele(fields, ref, alt)
+                    resolve_EAF(fields, ref, alt, freq)
                     break # after this a new line of GWAS SS should be read and index incremented
                 else: #rsid > bp_gwas:
                     fields[cols_i['Chr']] = '.'
@@ -629,34 +676,17 @@ if current_build != 'hg38' and file_exists(CHAIN_FILE):
     resolvers_args.append([converter])
 
 
-if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA']):
+if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_FILE):
     """
     These resolvers assumes GWAS SS file is sorted by Chr and BP in accord to the SNPs file
     """
     SNPs_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
     SNPs_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_FILE_o_gz))
-    # SNPs_FILE_line_i = 0
 
-    """
-    SNPs_FILE, being a VCF file, starts with comment lines at the beginning. Comments start with ##
-    Then comes a header, starts with #
-    after the header comes the dataframe table
+    resolvers.append(resolve_rsID)
+    resolvers_args.append([SNPs_FILE_o])
 
-    THIS codeblock skips all the comment lines,
-    then reads the header line before going to the next loop.
-    this prevents putting more conditions into the loop
-    """
-    SNPs_line = SNPs_FILE_o.readline()
-    # SNPs_FILE_line_i += 1
-    while SNPs_line.startswith('##'):
-        SNPs_line = SNPs_FILE_o.readline()
-        # SNPs_FILE_line_i += 1
-
-    if issues['rsID']:
-        resolvers.append(resolve_rsID)
-        resolvers_args.append([SNPs_FILE_o])
-
-if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA']):
+if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_rsID_FILE):
     """
     This ChrBP resolver assumes GWAS SS file is sorted by rsID
     """
@@ -664,9 +694,8 @@ if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or 
     SNPs_rsID_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_rsID_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
     SNPs_rsID_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_rsID_FILE_o_gz))
 
-    if issues['Chr'] or issues['BP']:
-        resolvers.append(resolve_ChrBP)
-        resolvers_args.append([SNPs_rsID_FILE_o])
+    resolvers.append(resolve_ChrBP)
+    resolvers_args.append([SNPs_rsID_FILE_o])
 
 
 if issues['SE'] and issues['beta']<total_entries and issues['pval']<total_entries:
