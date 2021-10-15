@@ -502,9 +502,9 @@ def resolve_build38(fields, converter):
     Will use the input converter dictionary to liftover
     from the build specified by the user to build38 (with 'chr' prefix)
     """
-    chr_gwas = CHR_LIFTOVER[fields[cols_i['Chr']]]
-    bp_gwas  = int(fields[cols_i['BP']])
     try:
+        chr_gwas = CHR_LIFTOVER[fields[cols_i['Chr']]]
+        bp_gwas  = int(float(fields[cols_i['BP']])) # using float allows sci notation string
         new_chr, new_bp, _ = converter[chr_gwas][bp_gwas][0]
         fields[cols_i["Chr"]] = new_chr.replace('chr', '')
         fields[cols_i["BP"]] = str(new_bp)
@@ -533,7 +533,7 @@ def resolve_rsID(fields, SNPs_FILE_o):
     ]):
         try:
             chr_gwas = fields[cols_i['Chr']]
-            bp_gwas  = int(fields[cols_i['BP']])
+            bp_gwas  = int(float(fields[cols_i['BP']]))
 
             while True:
                 chr_snps, bp_snps, rsid, ref, alt, freq = read_dbSNP1_data_row(SNPs_FILE_o)
