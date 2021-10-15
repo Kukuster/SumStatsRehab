@@ -23,9 +23,6 @@
 
 
 ### BACKLOG
- - add requirements.txt and things to easily recreate the environment
- - improve interface. Use argparse or something like that for convenient CLI arguments. Add commands for preprocessing dbSNP, and separate commands: `diagnose` and `sort`.
- - add a resolver for MAF, and a liftover resolver (from build 37 to build 38)
  - a config file has to be generated with all the names of the intermediary files (or does it). This will improve refactoring into the actual pipeline.
  - (maybe) improve restoring alleles by adding checks for exact match of flipped alleles, if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory, and is relevant only for restoring alleles by looping through file sorted by Chr and BP.
  - add ability to specify additional columns from the GWAS SS file that user wants to include in the end file. This would be an array in the the json config file for the input GWAS SS file.
