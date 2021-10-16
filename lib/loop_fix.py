@@ -43,7 +43,7 @@ OUTPUT_GWAS_FILE = sys.argv[3]
 SNPs_FILE = sys.argv[4]
 SNPs_rsID_FILE = sys.argv[5]
 CHAIN_FILE = sys.argv[6]
-FREQ_DATABASE_SLUG = sys.argv[7] if sys.argv[7] != 'None' else None
+FREQ_DATABASE_SLUG = sys.argv[7].lower() if sys.argv[7] != 'None' else None
 
 GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None
 if len(sys.argv) > 8:
@@ -478,6 +478,7 @@ def resolve_EAF(fields, REF, ALT, SNP_freq_field):
     if not is_valid_EAF(fields) and is_valid_EA(fields):
         try:
             freqs = SNP_freq_field.replace('freq=','').replace('|',':').split(':') # ["1000Genomes", "0.9988,.,0.001198", "GnomAD", "0.9943,0.005747,."]
+            freqs = [f.lower() for f in freqs]  # ["1000genomes", "0.9988,.,0.001198", "gnomad", "0.9943,0.005747,."]
             alleles = (REF+','+ALT).split(',') # ["TA", "T", "TAA"]
             EA = fields[cols_i['EA']] # "T"
 
@@ -513,7 +514,6 @@ def resolve_build38(fields, converter):
         except:
             fields[cols_i["Chr"]] = '.'
             fields[cols_i["BP"]] = '.'
-            fields[cols_i["rsID"]] = '.'
 
 
 def resolve_rsID(fields, SNPs_FILE_o):
