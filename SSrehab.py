@@ -103,7 +103,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     print(f'=== Step {i_step}: Validate entries in the formatted GWAS SS file and save the report ===')
     start_time = time.time()
 
-    input_validation_report_dir = INPUT_GWAS_FILE.split('/')[-1] + "_input-report"
+    input_validation_report_dir = INPUT_GWAS_FILE + "_input-report"
     ec = call(["python3",
             validate_GWASSS_entries,
             INPUT_GWAS_FILE_standard,
@@ -209,7 +209,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     print(f'=== Step {i_step}: Validate entries in the fixed GWAS SS file and save the report ===')
     start_time = time.time()
 
-    REHABed_validation_report_dir = INPUT_GWAS_FILE.split('/')[-1] + "_REHABed-report"
+    REHABed_validation_report_dir = INPUT_GWAS_FILE + "_REHABed-report"
     ec = call(["python3",
             validate_GWASSS_entries,
             REHAB_OUTPUT_FILE,
@@ -307,7 +307,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     print(f'=== Step {i_step}: Validate entries in the twice REHABed GWAS SS file and save the report ===')
     start_time = time.time()
 
-    REHABed_twice_validation_report_dir = INPUT_GWAS_FILE.split('/')[-1] + "_REHABed-twice-report"
+    REHABed_twice_validation_report_dir = INPUT_GWAS_FILE + "_REHABed-twice-report"
     ec = call(["python3",
             validate_GWASSS_entries,
             REHAB2_OUTPUT_FILE,
