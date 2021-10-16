@@ -268,7 +268,7 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 3. base pair position
     try:
-        bp = int(bp)
+        bp = int(float(bp)) # using float allows sci notation string
         if bp < 0:
             issues[INVALID_BP] = True
     except:

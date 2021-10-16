@@ -310,7 +310,7 @@ def is_valid_Chr(fields):
 
 def is_valid_BP(fields):
     try:
-        bp = int(fields[cols_i["BP"]])
+        bp = int(float(fields[cols_i["BP"]])) # using float allows sci notation string
         if bp < 0:
             return False
     except:
@@ -502,17 +502,18 @@ def resolve_build38(fields, converter):
     Will use the input converter dictionary to liftover
     from the build specified by the user to build38 (with 'chr' prefix)
     """
-    try:
+    if is_valid_Chr(fields) and is_valid_BP(fields):
         chr_gwas = CHR_LIFTOVER[fields[cols_i['Chr']]]
         bp_gwas  = int(float(fields[cols_i['BP']])) # using float allows sci notation string
-        new_chr, new_bp, _ = converter[chr_gwas][bp_gwas][0]
-        fields[cols_i["Chr"]] = new_chr.replace('chr', '')
-        fields[cols_i["BP"]] = str(new_bp)
-    # if it can't liftover
-    except:
-        fields[cols_i["Chr"]] = '.'
-        fields[cols_i["BP"]] = '.'
-        fields[cols_i["rsID"]] = '.'
+        try:
+            new_chr, new_bp, _ = converter[chr_gwas][bp_gwas][0]
+            fields[cols_i["Chr"]] = new_chr.replace('chr', '')
+            fields[cols_i["BP"]] = str(new_bp)
+        # if it can't liftover
+        except:
+            fields[cols_i["Chr"]] = '.'
+            fields[cols_i["BP"]] = '.'
+            fields[cols_i["rsID"]] = '.'
 
 
 def resolve_rsID(fields, SNPs_FILE_o):
@@ -667,9 +668,22 @@ MAIN_start_time = STEP1_start_time = time.time()
 
 issues, total_entries = read_report_from_dir(REPORT_DIR)
 
+
+if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_rsID_FILE):
+    """
+    This ChrBP resolver assumes GWAS SS file is sorted by rsID
+    """
+    # open files here
+    SNPs_rsID_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_rsID_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
+    SNPs_rsID_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_rsID_FILE_o_gz))
+
+    resolvers.append(resolve_ChrBP)
+    resolvers_args.append([SNPs_rsID_FILE_o])
+
+
 current_build = get_build()
 converter = None
-if current_build != 'hg38' and file_exists(CHAIN_FILE):
+if current_build != 'hg38' and file_exists(CHAIN_FILE) and GWAS_SORTING != 'rsID':
     converter = get_lifter_from_ChainFile(CHAIN_FILE, current_build, 'hg38')
     set_build('hg38')
     resolvers.append(resolve_build38)
@@ -685,17 +699,6 @@ if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA'] o
 
     resolvers.append(resolve_rsID)
     resolvers_args.append([SNPs_FILE_o])
-
-if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_rsID_FILE):
-    """
-    This ChrBP resolver assumes GWAS SS file is sorted by rsID
-    """
-    # open files here
-    SNPs_rsID_FILE_o_gz: io.RawIOBase = gzip.open(SNPs_rsID_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
-    SNPs_rsID_FILE_o = io.TextIOWrapper(io.BufferedReader(SNPs_rsID_FILE_o_gz))
-
-    resolvers.append(resolve_ChrBP)
-    resolvers_args.append([SNPs_rsID_FILE_o])
 
 
 if issues['SE'] and issues['beta']<total_entries and issues['pval']<total_entries:
