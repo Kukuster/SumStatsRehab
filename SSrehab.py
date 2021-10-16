@@ -233,8 +233,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     issues_solved = {c: issues[c]-issues_REHABed[c] for c in issues}
     for col in STANDARD_COLUMN_ORDER:
         if col not in ('N', 'INFO') and issues_solved[col]:
-            if issues_solved[col] < 0 and col in ('Chr', 'BP') and get_build() != input_build:
-                print(f"lost {issues_solved[col]} entries for \"{col}\" column after liftover")
+            if issues_solved[col] < 0:
+                if col in ('Chr', 'BP') and get_build() != input_build:
+                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column after liftover")
+                else:
+                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
             else:
                 print(f"restored {issues_solved[col]} entries for \"{col}\" column")
 
@@ -331,8 +334,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     issues_solved = {c: issues[c]-issues_REHABed_twice[c] for c in issues}
     for col in STANDARD_COLUMN_ORDER:
         if col not in ('N', 'INFO') and issues_solved[col]:
-            if issues_solved[col] < 0 and col in ('Chr', 'BP') and get_build() != input_build:
-                print(f"lost {issues_solved[col]} entries for \"{col}\" column after liftover")
+            if issues_solved[col] < 0:
+                if col in ('Chr', 'BP') and get_build() != input_build:
+                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column after liftover")
+                else:
+                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
             else:
                 print(f"restored {issues_solved[col]} entries for \"{col}\" column")
 
