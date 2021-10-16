@@ -291,7 +291,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             REHAB2_OUTPUT_FILE,
             dbSNP_FILE,
             dbSNP2_FILE,
-            CHAIN_FILE if CHAIN_FILE else 'None',
+            'None', # setting to None suppresses liftover second time
             FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
             sorted_by if sorted_by else ''
             ])
@@ -335,10 +335,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     for col in STANDARD_COLUMN_ORDER:
         if col not in ('N', 'INFO') and issues_solved[col]:
             if issues_solved[col] < 0:
-                if col in ('Chr', 'BP') and get_build() != input_build:
-                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column after liftover")
-                else:
-                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
+                print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
             else:
                 print(f"restored {issues_solved[col]} entries for \"{col}\" column")
 
