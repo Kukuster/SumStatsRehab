@@ -669,6 +669,15 @@ MAIN_start_time = STEP1_start_time = time.time()
 issues, total_entries = read_report_from_dir(REPORT_DIR)
 
 
+current_build = get_build()
+converter = None
+if current_build != 'hg38' and file_exists(CHAIN_FILE):
+    converter = get_lifter_from_ChainFile(CHAIN_FILE, current_build, 'hg38')
+    set_build('hg38')
+    resolvers.append(resolve_build38)
+    resolvers_args.append([converter])
+
+
 if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_rsID_FILE):
     """
     This ChrBP resolver assumes GWAS SS file is sorted by rsID
@@ -679,15 +688,6 @@ if GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or 
 
     resolvers.append(resolve_ChrBP)
     resolvers_args.append([SNPs_rsID_FILE_o])
-
-
-current_build = get_build()
-converter = None
-if current_build != 'hg38' and file_exists(CHAIN_FILE) and GWAS_SORTING != 'rsID':
-    converter = get_lifter_from_ChainFile(CHAIN_FILE, current_build, 'hg38')
-    set_build('hg38')
-    resolvers.append(resolve_build38)
-    resolvers_args.append([converter])
 
 
 if GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_FILE):
