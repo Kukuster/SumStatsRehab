@@ -126,9 +126,44 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     issues, total_entries = read_report_from_dir(input_validation_report_dir)
 
     required_sorting: bool = False
+    required_liftover: bool = False
     sorted_by: Literal[None, 'rsID', 'ChrBP'] = None
     INPUT_GWAS_FILE_standard_sorted = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted.tsv"
+    INPUT_GWAS_FILE_standard_lifted = remove_last_ext(INPUT_GWAS_FILE) + "_standard_lifted.tsv"
 
+
+    if get_build() != 'hg38' and CHAIN_FILE and CHAIN_FILE != "None" and issues['BP']<total_entries and issues['Chr']<total_entries:
+        required_liftover = True
+        ec = call(["python3",
+                loop_fix,
+                INPUT_GWAS_FILE_standard,
+                input_validation_report_dir,
+                INPUT_GWAS_FILE_standard_lifted,
+                dbSNP_FILE,
+                dbSNP2_FILE,
+                CHAIN_FILE,
+                FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
+                sorted_by if sorted_by else ''
+                ])
+
+        if ec != 0:
+            print(f"ERROR: loop_fix (liftover) script finished with exit code: {ec}")
+            exit(13)
+
+        print("finished liftover to hg38 (saved report)")
+        set_build('hg38')
+
+        input_lifted_validation_report_dir = INPUT_GWAS_FILE + "_input-lifted-report"
+        ec = call(["python3",
+            validate_GWASSS_entries,
+            INPUT_GWAS_FILE_standard_lifted,
+            "standard",
+            input_lifted_validation_report_dir,
+            ])
+        if ec != 0:
+            print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
+            exit(13)
+    
     if (issues['BP'] or issues['Chr']) and issues['rsID']<total_entries:
         # here if some alleles are invalid, they will be attempted to be restored by rsID, which is better then by ChrBP
         required_sorting = True
@@ -139,7 +174,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
         print(f"Going to sort the GWAS SS file by rsID")
         ec = call(["python3",
             sort_GWASSS_by_rsID,
-            INPUT_GWAS_FILE_standard,
+            INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
             ])
         if ec == 0:
@@ -147,7 +182,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
         else:
             print(f"ERROR: sort_GWASSS_by_rsID script finished with exit code: {ec}")
 
-    elif issues['rsID'] or issues['OA'] or issues['EA']:
+    elif (issues['rsID'] or issues['OA'] or issues['EA']) and issues['Chr']<total_entries and issues['BP']<total_entries:
         required_sorting = True
         sorted_by = 'ChrBP'
         for col in ('rsID', 'OA', 'EA'):
@@ -156,7 +191,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
         print(f"Going to sort the GWAS SS file by Chr and BP")
         ec = call(["python3",
             sort_GWASSS_by_ChrBP,
-            INPUT_GWAS_FILE_standard,
+            INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
             ])
         if ec == 0:
@@ -190,7 +225,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             REHAB_OUTPUT_FILE,
             dbSNP_FILE,
             dbSNP2_FILE,
-            CHAIN_FILE if CHAIN_FILE else 'None',
+            'None',
             FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
             sorted_by if sorted_by else ''
             ])
