@@ -272,14 +272,14 @@ where:
 """
 def get_StdErr_from_beta_pval(beta, p):
     z = normal_z_score_two_tailed(p)
-    return abs(beta)/z
+    return abs(beta)/z if z != 0 else 'nan'
 
 def get_beta_from_StdErr_pval(se, p):
     z = normal_z_score_two_tailed(p)
     return se*z
 
 def get_pval_from_beta_StdErr(beta, se):
-    z = abs(beta)/se
+    z = abs(beta)/se if se != 0 else 'nan'
     return normal_p_area_two_tailed(z)
 
 
