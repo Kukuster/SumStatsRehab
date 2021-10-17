@@ -611,17 +611,17 @@ def resolve_ChrBP(fields, SNPs_rsID_FILE_o):
 
 
 def resolve_SE(fields):
-    if not is_valid_SE(fields):
+    if not is_valid_SE(fields) and is_valid_beta(fields) and is_valid_pval(fields):
         fields[cols_i["SE"]] = str(get_StdErr_from_beta_pval(
             float(fields[cols_i["beta"]]), float(fields[cols_i["pval"]])
         ))
 def resolve_beta(fields):
-    if not is_valid_beta(fields):
+    if not is_valid_beta(fields) and is_valid_SE(fields) and is_valid_pval(fields):
         fields[cols_i["beta"]] = str(get_beta_from_StdErr_pval(
             float(fields[cols_i["SE"]]), float(fields[cols_i["pval"]])
         ))
 def resolve_pval(fields):
-    if not is_valid_pval(fields):
+    if not is_valid_pval(fields) and is_valid_beta(fields) and is_valid_SE(fields):
         fields[cols_i["pval"]] = str(get_pval_from_beta_StdErr(
             float(fields[cols_i["beta"]]), float(fields[cols_i["SE"]])
         ))
