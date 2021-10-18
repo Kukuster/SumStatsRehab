@@ -36,7 +36,7 @@ JSON_CONFIG = sys.argv[2]
 
 REPORT_DIR = None
 REPORT_ABS_DIR = None
-if len(sys.argv) > 3:
+if len(sys.argv) > 3 and sys.argv[3]:
     REPORT_DIR = sys.argv[3]
     REPORT_ABS_DIR = os.path.abspath(REPORT_DIR)
 
@@ -161,6 +161,7 @@ ISSUES_COLORS=[
 ]
 
 NUCLEOTIDES = ['a', 't', 'c', 'g']
+NO_NUCLEOTIDE = '.'
 
 ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS = True
 
@@ -235,15 +236,15 @@ def check_row(line_cols: List[str]) -> Union[
 
     ### Try getting all columns. If some not present, will throw ###
     try:
-        rsid = line_cols[cols_i["rsID"]]
-        chr  = line_cols[cols_i["Chr"]]
-        bp   = line_cols[cols_i["BP"]]
-        ea   = line_cols[cols_i["EA"]]
-        oa   = line_cols[cols_i["OA"]]
-        af   = line_cols[cols_i["EAF"]]
-        se   = line_cols[cols_i["SE"]]
-        es   = line_cols[cols_i["beta"]]
-        # n    = line_cols[cols_i["N"]]
+        rsid  = line_cols[cols_i["rsID"]]
+        chrom = line_cols[cols_i["Chr"]]
+        bp    = line_cols[cols_i["BP"]]
+        ea    = line_cols[cols_i["EA"]]
+        oa    = line_cols[cols_i["OA"]]
+        af    = line_cols[cols_i["EAF"]]
+        se    = line_cols[cols_i["SE"]]
+        es    = line_cols[cols_i["beta"]]
+        # n     = line_cols[cols_i["N"]]
 
     except:
         issues[INVALID_ROW] = True
@@ -260,14 +261,14 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 2. chromosome
     try:
-        if chr not in CATEGORY_CHR and chr[3:] not in CATEGORY_CHR:
+        if chrom not in CATEGORY_CHR and chrom[3:] not in CATEGORY_CHR:
             issues[INVALID_CHR] = True
     except:
         issues[INVALID_CHR] = True
 
     # 3. base pair position
     try:
-        bp = int(bp)
+        bp = int(float(bp)) # using float allows sci notation string
         if bp < 0:
             issues[INVALID_BP] = True
     except:
@@ -275,7 +276,11 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 4. effect allele
     try:
-        if ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
+        if ea == '':
+            issues[INVALID_EA] = True
+        elif ea == NO_NUCLEOTIDE:
+            issues[INVALID_EA] = False
+        elif ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
             for char in ea.lower():
                 if char not in NUCLEOTIDES:
                     issues[INVALID_EA] = True
@@ -287,7 +292,11 @@ def check_row(line_cols: List[str]) -> Union[
 
     # 5. other allele
     try:
-        if ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
+        if oa == '':
+            issues[INVALID_OA] = True
+        elif oa == NO_NUCLEOTIDE:
+            issues[INVALID_OA] = False
+        elif ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS:
             for char in oa.lower():
                 if char not in NUCLEOTIDES:
                     issues[INVALID_OA] = True
@@ -367,7 +376,7 @@ SNPs_issues = np.empty((num_of_snps, len(ISSUES)), dtype=bool)
 try:
     snp_i = 0
     while True:
-        SNPs_pval[snp_i], SNPs_report[snp_i], SNPs_issues[snp_i] = check_row(GWAS_FILE_o.readline().strip().split(separator))
+        SNPs_pval[snp_i], SNPs_report[snp_i], SNPs_issues[snp_i] = check_row(GWAS_FILE_o.readline().replace('\n','').split(separator))
         snp_i += 1
 
 except Exception as e:
@@ -569,7 +578,7 @@ proportion_of_invalid_entries_bins = [0.] + [
                 for i in range(1, len(good_entry_bins))]
 
 percentage_of_invalid_entries_bins = np.round(np.array(proportion_of_invalid_entries_bins)*100).astype(int)
-percentage_of_invalid_entries_bins_str = np.char.array(percentage_of_invalid_entries_bins) + "%"
+percentage_of_invalid_entries_bins_str = np.char.array(percentage_of_invalid_entries_bins) + "%" # type: ignore # pylance mistakenly doesn't recognize np.char
 
 
 

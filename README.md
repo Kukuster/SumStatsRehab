@@ -1,20 +1,12 @@
 # SSrehab
 
 ## how to run
-run `SSrehab.py` with `python3`. It accepts 3 arguments:
- 1. Path to GWAS summary statistics file in tsv format, that has a corresponding config file (suffixed \".json\") with column indices. Use `sample/config.example.json` as a template. No columns are required to specify. If you don't specify a column, `SSrehab` will attempt to fully restore it, when possible.
- 2. Path to the output fixed GWAS SS file
- 3. Path to a dbSNP file that corresponds to the input GWAS SS file
-
-e.g.:
-```python
-python3 SSrehab.py "sample/29559693_randlines50000.tsv" "sample/29559693_randlines50000_SSREHAB-FIXED.tsv" "/media/$USER/exFAT_share/SelfDecode/dbSNP151_GRCh37.vcf.gz"
-# this implies that config file exists at: "sample/29559693_randlines50000.tsv.json"
-```
+...
 
 ## main dependencies:
- - python3
+ - python 3.8+
  - Linux system with bash v4 or 5
+ - python packages in `requirements.txt`
 
 
 ## NOTES
@@ -30,10 +22,11 @@ python3 SSrehab.py "sample/29559693_randlines50000.tsv" "sample/29559693_randlin
 
 
 
-### TODO:
- - add requirements.txt and things to easily recreate the environment
- - improve interface. Use argparse or something like that for convenient CLI arguments
- - add conditional statements that will check cases when all entries in particular columns are missing. If vital columns are missing for restoring something, don't attempt to restore it and provide a warning message
- - add resolvers for Chr&BP, alleles, and MAF
- - improve comments in `lib/loop_fix.py`
+### BACKLOG
+ - a config file has to be generated with all the names of the intermediary files (or does it). This will improve refactoring into the actual pipeline.
+ - (maybe) improve restoring alleles by adding checks for exact match of flipped alleles, if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory, and is relevant only for restoring alleles by looping through file sorted by Chr and BP.
+ - add ability to specify additional columns from the GWAS SS file that user wants to include in the end file. This would be an array in the the json config file for the input GWAS SS file.
+ - it could be that its better to do liftover in a separate loop_fix run. So it will be up to 3 loop_fix runs
+ - improve code in the main file: `SSrehab.py`
+ - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
 

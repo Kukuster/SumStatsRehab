@@ -82,7 +82,7 @@ def resolve_bare_text_file(maybe_archive_path: str, unpacked_text_file_path: str
     if not file_exists(maybe_archive_path):
         raise FileNotFoundError(f"Failed attempt to open file at path: {maybe_archive_path}")
 
-    mime: str = magic.from_file(maybe_archive_path, mime=True)
+    mime: str = magic.from_file(os.path.realpath(maybe_archive_path), mime=True)
 
     if mime == 'application/gzip' or mime == 'application/x-gzip':
         print("the SS file is a gzip. Unpacking")
