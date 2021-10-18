@@ -74,7 +74,8 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     except:
         raise ValueError('config file that corresponds to the GWAS SS file has to have "build" key set')
     set_build(input_build)
-    print(f'input build: {get_build()}')
+    input_build = get_build()
+    print(f'input build: {input_build}')
 
 
     i_step = 0

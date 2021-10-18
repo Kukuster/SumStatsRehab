@@ -549,10 +549,12 @@ def resolve_rsID(fields, SNPs_FILE_o):
                         resolve_EAF(fields, ref, alt, freq)
                         break # after this a new line of GWAS SS should be read and index incremented
                     else: #bp_snps > bp_gwas:
-                        fields[cols_i['rsID']] = '.'
+                        if not is_valid_rsID(fields):
+                            fields[cols_i['rsID']] = '.'
                         break # after this a new line of GWAS SS should be read and index incremented
                 elif gt(CHR_ORDER[chr_snps], CHR_ORDER[chr_gwas]):
-                    fields[cols_i['rsID']] = '.'
+                    if not is_valid_rsID(fields):
+                        fields[cols_i['rsID']] = '.'
                     break # after this a new line of GWAS SS should be read and index incremented
 
         except Exception as e:
@@ -596,8 +598,9 @@ def resolve_ChrBP(fields, SNPs_rsID_FILE_o):
                     resolve_EAF(fields, ref, alt, freq)
                     break # after this a new line of GWAS SS should be read and index incremented
                 else: #rsid > bp_gwas:
-                    fields[cols_i['Chr']] = '.'
-                    fields[cols_i['BP']] = '.'
+                    if not is_valid_Chr(fields) or not is_valid_BP(fields):
+                        fields[cols_i['Chr']] = '.'
+                        fields[cols_i['BP']] = '.'
                     break # after this a new line of GWAS SS should be read and index incremented
 
         except Exception as e:
