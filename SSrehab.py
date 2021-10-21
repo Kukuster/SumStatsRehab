@@ -134,6 +134,8 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
 
     if get_build() != 'hg38' and CHAIN_FILE and CHAIN_FILE != "None" and issues['BP']<total_entries and issues['Chr']<total_entries:
+        # if either BP or Chr is fully missing,
+        # there's no need for liftover since those will be resotred with dbSNPs in the target build
         required_liftover = True
         ec = call(["python3",
                 loop_fix,
@@ -426,21 +428,26 @@ def sort(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, SORT_BY: str):
     OUTPUT_FILE = str(OUTPUT_FILE)
     SORT_BY = str(SORT_BY)
 
-    ##### 1 #####
-    print(f'=== Format the GWAS SS file ===')
-    start_time = time.time()
+    FILE_TO_SORT = INPUT_GWAS_FILE
 
-    OUTPUT_FILE_unsorted = OUTPUT_FILE + ".unsorted.tsv"
-    ec = call(["python3",
-            prepare_GWASSS_columns,
-            INPUT_GWAS_FILE,
-            OUTPUT_FILE_unsorted,
-            ])
-    print(f"  Formatting finished in {(time.time() - start_time)} seconds\n")
+    if os.path.isfile(INPUT_GWAS_FILE+".json"):
+        ##### 1 #####
+        print(f'=== Format the GWAS SS file ===')
+        start_time = time.time()
 
-    if ec != 0:
-        print(f"ERROR: prepare_GWASSS_columns script finished with exit code: {ec}")
-        exit(11)
+        FILE_TO_SORT = OUTPUT_FILE + ".unsorted.tsv"
+        ec = call(["python3",
+                prepare_GWASSS_columns,
+                INPUT_GWAS_FILE,
+                FILE_TO_SORT,
+                ])
+        print(f"  Formatting finished in {(time.time() - start_time)} seconds\n")
+
+        if ec != 0:
+            print(f"ERROR: prepare_GWASSS_columns script finished with exit code: {ec}")
+            exit(11)
+    else:
+        print("there's no corresponding .json file, so STANDARD_COLUMN_ORDER is assumed")
 
 
     ##### 2 #####
@@ -450,7 +457,7 @@ def sort(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, SORT_BY: str):
     if SORT_BY == 'rsID':
         ec = call(["python3",
             sort_GWASSS_by_rsID,
-            OUTPUT_FILE_unsorted,
+            FILE_TO_SORT,
             OUTPUT_FILE,
             ])
         if ec != 0:
@@ -458,7 +465,7 @@ def sort(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, SORT_BY: str):
     elif SORT_BY == 'ChrBP':
         ec = call(["python3",
             sort_GWASSS_by_ChrBP,
-            OUTPUT_FILE_unsorted,
+            FILE_TO_SORT,
             OUTPUT_FILE,
             ])
         if ec != 0:
@@ -512,19 +519,19 @@ def GWASSS_path_type(string: str):
     a JSON object where column indices are specified and build
     """
     if not os.path.isfile(string):
-        raise FileNotFoundError(string)
+        raise ValueError("No such file:", string)
     if not os.path.isfile(string + '.json'):
-        raise FileNotFoundError(string + '.json')
+        raise ValueError("No such file:", string + '.json')
     return string
 
 def maybe_dir_type(string: str):
     if not os.path.isdir(string) and os.path.exists(string):
-        raise NotADirectoryError(string)
+        raise ValueError("No such directory:", string)
     return string
 
 def file_path_type(string: str):
     if not os.path.isfile(string):
-        raise FileNotFoundError(string)
+        raise ValueError("No such file:", string)
     return string
 
 
