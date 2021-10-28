@@ -46,6 +46,10 @@ def remove_last_ext(filename: str):
     return filename.rsplit(".", 1)[0] # passed 1 means do max 1 split; _rightmost_ splits first
 
 
+def perc(x, total):
+    return str(round((x/total)*100, 2)) + "%"
+
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                                                 #
@@ -273,11 +277,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
         if col not in ('N', 'INFO') and issues_solved[col]:
             if issues_solved[col] < 0:
                 if col in ('Chr', 'BP') and get_build() != input_build:
-                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column after liftover")
+                    print(f"lost {-issues_solved[col]} ({perc(-issues_solved[col], total_entries)}) \"{col}\" fields after liftover")
                 else:
-                    print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
+                    print(f"lost {-issues_solved[col]} ({perc(-issues_solved[col], total_entries)}) \"{col}\" fields")
             else:
-                print(f"restored {issues_solved[col]} entries for \"{col}\" column")
+                print(f"restored {issues_solved[col]} ({perc(issues_solved[col], total_entries)}) \"{col}\" fields")
 
     INPUT_GWAS_FILE_standard_sorted2 = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted2.tsv"
 
@@ -373,9 +377,9 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     for col in STANDARD_COLUMN_ORDER:
         if col not in ('N', 'INFO') and issues_solved[col]:
             if issues_solved[col] < 0:
-                print(f"lost {-issues_solved[col]} entries for \"{col}\" column")
+                print(f"lost {-issues_solved[col]} ({perc(-issues_solved[col], total_entries)}) \"{col}\" fields")
             else:
-                print(f"restored {issues_solved[col]} entries for \"{col}\" column")
+                print(f"restored {issues_solved[col]} ({perc(issues_solved[col], total_entries)}) \"{col}\" fields")
 
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
@@ -563,7 +567,7 @@ def main():
 
 
     DIAGNOSE_PARSER.add_argument('--INPUT', dest='INPUT_GWAS_FILE', type=file_path_type, required=True,
-        help='Path to GWAS summary stats in tab-separated format (.tsv, .tsv.gz, .tsv.zip), with a config file at the same path with .json suffix. If the config file is absent, internal "STANDARD_COLUMN_ORDER" is assumed.')
+        help='Path to GWAS summary stats in tab-separated format (.tsv, .tsv.gz), with a config file at the same path with .json suffix. If the config file is absent, internal "STANDARD_COLUMN_ORDER" is assumed.')
     DIAGNOSE_PARSER.add_argument('--REPORT-DIR', dest='REPORT_DIR', type=maybe_dir_type, required=False, default='None',
         help='A directory where the report should be saved. If not specified, doesn\'t save the full report and pops up matplotlib plots instead')
 

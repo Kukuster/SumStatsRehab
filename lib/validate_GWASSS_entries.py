@@ -6,13 +6,17 @@ import os
 import json
 import subprocess
 import time
+import gzip
+import io
 
 # third-party libraries
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
+import magic
 
 # local
+from utils import run_bash
 from validate_utils import write_report_to_dir
 
 
@@ -51,7 +55,17 @@ if not file_exists(GWAS_FILE):
     exit(1)
 
 
-GWAS_FILE_o = open(GWAS_FILE, 'r')
+mime: str = magic.from_file(GWAS_FILE, mime=True)
+if mime == 'application/gzip' or mime == 'application/x-gzip':
+    GWAS_FILE_o_gz: io.RawIOBase = gzip.open(GWAS_FILE, 'r')  # type: ignore # GzipFile and RawIOBase _are_ in fact compatible
+    GWAS_FILE_o = io.TextIOWrapper(io.BufferedReader(GWAS_FILE_o_gz))
+elif mime == 'text/plain':
+    GWAS_FILE_o = open(GWAS_FILE, 'r')
+elif mime == 'inode/x-empty':
+    raise FileNotFoundError('The provided file is empty!')
+else:
+    raise ValueError(f"Got unexpected type of file: {mime}")
+
 
 if JSON_CONFIG == "standard":
     cols_i: Dict[str, int] = {
@@ -185,12 +199,11 @@ CATEGORY_CHR = [
 # https://gist.github.com/zed/0ac760859e614cd03652
 def wccount(filename: str):
     """counts the number of lines in the file"""
-    out = subprocess.Popen(['wc', '-l', filename],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT
-                         ).communicate()[0]
-    return int(out.partition(b' ')[0])
-
+    if mime == 'application/gzip' or mime == 'application/x-gzip':
+        out = run_bash(f'gunzip -c "{filename}" | wc -l')
+    else:
+        out = run_bash(f'wc -l "{filename}"')
+    return int(out.partition(' ')[0])
 
 def is_null(val: str) -> bool:
     return val.lower() in ["", " ", ".", "-", "na", "nan"]
