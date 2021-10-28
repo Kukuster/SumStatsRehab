@@ -135,7 +135,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
     if get_build() != 'hg38' and CHAIN_FILE and CHAIN_FILE != "None" and issues['BP']<total_entries and issues['Chr']<total_entries:
         # if either BP or Chr is fully missing,
-        # there's no need for liftover since those will be resotred with dbSNPs in the target build
+        # there's no need for liftover since those will be restored with dbSNPs in the target build
         required_liftover = True
         ec = call(["python3",
                 loop_fix,

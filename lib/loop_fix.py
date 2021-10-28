@@ -75,7 +75,7 @@ cols_i: Dict[str, int] = {STANDARD_COLUMN_ORDER[i]:i for i in range(len(STANDARD
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 NUCLEOTIDES = ['a', 't', 'c', 'g']
-NO_NUCLEOTIDE = '.'
+NO_NUCLEOTIDE = '-'
 
 ALLOW_MULTI_NUCLEOTIDE_POLYMORPHISMS = True
 

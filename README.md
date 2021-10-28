@@ -25,7 +25,12 @@
 ### BACKLOG
  - a config file has to be generated with all the names of the intermediary files (or does it). This will improve refactoring into the actual pipeline.
  - (maybe) improve restoring alleles by adding checks for exact match of flipped alleles, if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory, and is relevant only for restoring alleles by looping through file sorted by Chr and BP.
- - add ability to specify additional columns from the GWAS SS file that user wants to include in the end file. This would be an array in the the json config file for the input GWAS SS file.
+ - add ability to specify additional columns from the GWAS SS file that user wants to include in the end file. This would be an array of integers in the the json config file for the input GWAS SS file.
  - improve code in the main file: `SSrehab.py`
  - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
-
+ - improve interface for liftover. SSrehab fix should work for all sorts of liftover between builds 36, 37, and 38, including back liftover. If user omits the preprocessed dbSNP databases as input, but specifies the chain file, it can perform liftover only.
+ - introduce dependency on the STANDARD_COLUMN_ORDER in the `validate_GWASSS_entries.py` script
+ - add support for OR, and, maybe, restoring OR from beta or vice versa.
+ - add a keyword argument that will cause SSrehab fix to clean up all intermediate files and leave only the last resulting file after the processing.
+ - add a keyword argument that specifies tmp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
+ - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
