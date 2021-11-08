@@ -47,7 +47,10 @@ def remove_last_ext(filename: str):
 
 
 def perc(x, total):
-    return str(round((x/total)*100, 2)) + "%"
+    if x/total < 0.0001:
+        return "<0.01%"
+    else:
+        return str(round((x/total)*100, 2)) + "%"
 
 
 

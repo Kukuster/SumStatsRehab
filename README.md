@@ -216,3 +216,4 @@ python3 SSrehab.py <command> -h
  - add a keyword argument that will cause SSrehab fix to clean up all intermediate files and leave only the last resulting file after the processing.
  - add a keyword argument that specifies tmp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
+ - add a keyword argument that will cause SSrehab `fix` to prompt for fixing after the diagnosis step
