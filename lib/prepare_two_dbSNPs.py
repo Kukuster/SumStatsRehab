@@ -205,6 +205,10 @@ format_fields = f"""awk -F $'\t' 'BEGIN {{
     chrs["m"]  = "M";
 
  }}
+ # note: *in* operator checks if the string is in the array keys, which is probably O(1)
+ # the next block is executed on each row and ensures that:
+ #   - the chr prefix is removed wherever it's present
+ #   - if a field is one of the keys in the *chrs* array, it's mapped to the corresponding value
 {{
     if ($0 ~ /^chr/) {{
         print (substr($1,4) in chrs) ? chrs[substr($1,4)]"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6 : substr($1,4)"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6
@@ -220,7 +224,7 @@ print(f"  Preparing DB1 finished in {(time.time() - start_time)} seconds\n")
 
 #
 # STEP #2
-#    Sort the formatted table data by rsID
+#    FINALLY, sort the formatted table data by rsID, and remove the intermediate file
 #
 print("=== Preparing DB2 ===")
 start_time = time.time()

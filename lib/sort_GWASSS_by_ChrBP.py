@@ -115,9 +115,8 @@ run_bash(f'(head -n 1 "{GWAS_FILE_w_col}" && tail -n +2 "{GWAS_FILE_w_col}" | LC
 #
 # STEP #3
 #    FINALLY, cuts the temporary column after the sorting, leaving properly sorted file.
-#    Assumes the number of columns in the file is no more than 20. Shouldn't be that many, right?
 #
-run_bash(f"cut -d$'\t' -f2-20 \"{sorted_GWAS_FILE_w_col}\" > \"{OUTPUT_FILE}\"")
+run_bash(f"cut -d$'\t' -f2- \"{sorted_GWAS_FILE_w_col}\" > \"{OUTPUT_FILE}\"")
 
 
 run_bash(f'rm "{GWAS_FILE_w_col}" "{sorted_GWAS_FILE_w_col}"')

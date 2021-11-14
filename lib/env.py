@@ -15,11 +15,11 @@ def get_build() -> Literal['hg38', 'hg19', 'hg18']:
     build = os.getenv(GWASSS_BUILD_NUMBER_ENV)
     if build == None:
         return 'hg38'
-    elif build == 'hg38' or build.lower() == 'grch38':
+    elif build.lower() in ('hg38', 'grch38'):
         return 'hg38'
-    elif build == 'hg19' or build.lower() == 'grch37':
+    elif build.lower() in ('hg19', 'grch37'):
         return 'hg19'
-    elif build == 'hg18' or build.lower() == 'ncbi36':
+    elif build.lower() in ('hg18', 'ncbi36'):
         return 'hg18'
     else:
         raise WrongRuntimeEnvironmentVariable(f'got unknown GWAS SS build: \"{build}\"')
@@ -28,11 +28,11 @@ def get_build() -> Literal['hg38', 'hg19', 'hg18']:
 def set_build(build) -> Literal['hg38', 'hg19', 'hg18']:
     if build == None:
         return 'hg38'
-    elif build == 'hg38' or build.lower() == 'grch38' or str(build) == '38':
+    elif str(build).lower() in ('hg38', 'grch38', '38'):
         os.environ[GWASSS_BUILD_NUMBER_ENV] = 'hg38'
-    elif build == 'hg19' or build.lower() == 'grch37' or str(build) == '37':
+    elif str(build).lower() in ('hg19', 'grch37', '37'):
         os.environ[GWASSS_BUILD_NUMBER_ENV] = 'hg19'
-    elif build == 'hg18' or build.lower() == 'ncbi36' or str(build) == '36':
+    elif str(build).lower() in ('hg18', 'ncbi36', '36'):
         os.environ[GWASSS_BUILD_NUMBER_ENV] = 'hg18'
     else:
         raise WrongRuntimeEnvironmentVariable(f'got unknown GWAS SS build: \"{build}\"')

@@ -87,7 +87,7 @@ for i in range(len(STANDARD_COLUMN_ORDER)):
         # for any relevant column that's present, cut it.
         # if this is a chromosome column, make sure there's no "chr" prefix
         if col_name == 'Chr':
-            BASH_CMD.append(f"<(awk -F $'\\t' '{{if (${c_i} ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' < \"{BARE_GWAS_FILE}\")")
+            BASH_CMD.append(f"<(awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' < \"{BARE_GWAS_FILE}\")")
         else:
             BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
     else:
@@ -95,7 +95,7 @@ for i in range(len(STANDARD_COLUMN_ORDER)):
         # in this case, paste(1) will leave such columns empty, i.e. values are the empty string
         BASH_CMD.append(f"<(echo {col_name}_rehab)")
 
-BASH_CMD = BASH_CMD + [f">\"{OUTPUT_FILE}\""]
+BASH_CMD.append(f">\"{OUTPUT_FILE}\"")
 
 
 bash_code = ' '.join(BASH_CMD)

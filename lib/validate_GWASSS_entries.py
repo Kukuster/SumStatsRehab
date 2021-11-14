@@ -18,6 +18,7 @@ import magic
 # local
 from utils import run_bash
 from validate_utils import write_report_to_dir
+from standard_column_order import STANDARD_COLUMN_ORDER
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -68,19 +69,7 @@ else:
 
 
 if JSON_CONFIG == "standard":
-    cols_i: Dict[str, int] = {
-        "Chr":   0,
-        "BP":    1,
-        "rsID":  2,
-        "OA":    3,
-        "EA":    4,
-        "EAF":   5,
-        "beta":  6,
-        "SE":    7,
-        "pval":  8,
-        "N":     9,
-        "INFO": 10,
-    }
+    cols_i: Dict[str, int] = {STANDARD_COLUMN_ORDER[i]: i for i in range(len(STANDARD_COLUMN_ORDER))}
 else:
     if not file_exists(GWAS_FILE):
         print(f"ERROR: provided gwas file doesn't exist: {JSON_CONFIG}")
