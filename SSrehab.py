@@ -533,7 +533,7 @@ def GWASSS_path_type(string: str):
 
 def maybe_dir_type(string: str):
     if not os.path.isdir(string) and os.path.exists(string):
-        raise ValueError("No such directory:", string)
+        raise ValueError("Unable to create directory at: ", string)
     return string
 
 def file_path_type(string: str):
@@ -541,6 +541,12 @@ def file_path_type(string: str):
         raise ValueError("No such file:", string)
     return string
 
+def maybe_file_path_type(string: str):
+    if not string or string.lower() in ('none', 'na', 'null'):
+        return None
+    if not os.path.isfile(string):
+        raise ValueError("No such file:", string)
+    return string
 
 
 def main():
@@ -559,11 +565,11 @@ def main():
         help='Path to GWAS summary stats in tab-separated format (.tsv, .tsv.gz, .tsv.zip), with a config file at the same path with .json suffix')
     FIX_PARSER.add_argument('--OUTPUT', dest='OUTPUT_FILE', type=pathlib.Path, required=True,
         help='Output path. This name will be used as a base for output file(s)')
-    FIX_PARSER.add_argument('--dbsnp-1', dest='dbSNP1_FILE', type=file_path_type, required=False, default='None',
+    FIX_PARSER.add_argument('--dbsnp-1', dest='dbSNP1_FILE', type=maybe_file_path_type, required=False, default='None',
         help='Path to prepared dbSNP file #1 for the target build')
-    FIX_PARSER.add_argument('--dbsnp-2', dest='dbSNP2_FILE', type=file_path_type, required=False, default='None',
+    FIX_PARSER.add_argument('--dbsnp-2', dest='dbSNP2_FILE', type=maybe_file_path_type, required=False, default='None',
         help='Path to prepared dbSNP file #2 for the target build')
-    FIX_PARSER.add_argument('--chain-file', dest='CHAIN_FILE', type=file_path_type, required=False, default='None',
+    FIX_PARSER.add_argument('--chain-file', dest='CHAIN_FILE', type=maybe_file_path_type, required=False, default='None',
         help='Path to the chain file for liftover from given build to GrCh38')
     FIX_PARSER.add_argument('--freq-db', dest='FREQ_DATABASE_SLUG', type=str, required=False, default='dbGaP_PopFreq',
         help='Population slug from frequency database in dbSNP (e.g.: "GnomAD", "dbGaP_PopFreq", "TOMMO", "1000Genomes", etc.). Default: "dbGaP_PopFreq"')
