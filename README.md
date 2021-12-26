@@ -212,10 +212,13 @@ python3 SSrehab.py <command> -h
  - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
  - improve the interface for liftover. SSrehab fix should work for all sorts of liftovers between builds 36, 37, and 38, including back liftover. If the user omits the preprocessed dbSNP databases as input but specifies the chain file, it can perform liftover only.
  - add support for OR, and, maybe, restoration of OR from beta or vice versa.
- - add a keyword argument that will cause SSrehab fix to clean up all intermediate files and leave only the last resulting file after the processing.
+ - **add a keyword argument that will cause SSrehab fix to clean up all intermediate files and leave only the last resulting file after the processing.**
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
- - add a WARNING that beta will be restored with an accurate sign only when the standard error is signed.
+ - **add a WARNING that beta will be restored with an accurate sign only when the standard error is signed.**
  - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to test SSrehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
- - make SSrehab installable via `pip`
+ - **make SSrehab installable via `pip`**
+ - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.
+ - `diagnose` command script should also generate a bar chart for the bin with missing p-value
+ - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
