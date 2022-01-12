@@ -81,13 +81,17 @@ for i in range(len(STANDARD_COLUMN_ORDER)):
 
     if col_name in cols_i.keys():
         # user specifies column indices as starting with 0,
-        # whereas Unix cut(1) counts columns starting with 1
+        # whereas Unix cut(1) and awk count columns starting with 1
         c_i = current_col_index = cols_i[col_name] + 1
 
         # for any relevant column that's present, cut it.
         # if this is a chromosome column, make sure there's no "chr" prefix
         if col_name == 'Chr':
-            BASH_CMD.append(f"<(awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' < \"{BARE_GWAS_FILE}\")")
+            chrom_col_fd = f"<( "
+            chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
+            chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' ; "
+            chrom_col_fd += ")"
+            BASH_CMD.append(chrom_col_fd)
         else:
             BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
     else:
