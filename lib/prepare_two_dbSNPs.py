@@ -207,8 +207,8 @@ format_fields = f"""awk -F $'\t' 'BEGIN {{
  }}
  # note: *in* operator checks if the string is in the array keys, which is probably O(1)
  # the next block is executed on each row and ensures that:
- #   - the chr prefix is removed wherever it's present
- #   - if a field is one of the keys in the *chrs* array, it's mapped to the corresponding value
+ #   - the chr prefix is removed wherever it is present
+ #   - if a field is one of the keys in the *chrs* array, it is mapped to the corresponding value
 {{
     if ($0 ~ /^chr/) {{
         print (substr($1,4) in chrs) ? chrs[substr($1,4)]"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6 : substr($1,4)"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6
