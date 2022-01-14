@@ -8,6 +8,7 @@ import subprocess
 import time
 import gzip
 import io
+from enum import Enum
 
 # third-party libraries
 import numpy as np
@@ -113,10 +114,10 @@ assert ticks[0] >= 0 and ticks[-1] <= 1, "Ticks have to be in range from 0 to 1"
 #                                                 #
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-GOOD_ENTRY = 0
-MISSING_P_VALUE = 1
-INVALID_ENTRY = 2
-
+class RowStatus(Enum):
+    GOOD = 0
+    INVALID_P_VALUE = 1
+    INVALID = 2
 
 # indices for boolean values in a list of issues for each SNP
 INVALID_ROW = 0
@@ -208,11 +209,11 @@ def is_null(val: str) -> bool:
 
 def check_row(line_cols: List[str]) -> Union[
         # "good" entry
-        Tuple[float, Literal[0], List[bool]],
-        # "missing p-value" entry
-        Tuple[None,  Literal[1], List[bool]],
+        Tuple[float, Literal[RowStatus.GOOD], List[bool]],
+        # "missing/invalid p-value" entry
+        Tuple[None,  Literal[RowStatus.INVALID_P_VALUE], List[bool]],
         # "invalid" entry, having some issues (listed in the list)
-        Tuple[float, Literal[2], List[bool]],
+        Tuple[float, Literal[RowStatus.INVALID], List[bool]],
     ]:
     """
     This function runs for EVERY LINE of the input file,
@@ -225,15 +226,16 @@ def check_row(line_cols: List[str]) -> Union[
     """
 
     issues = [False] * len(ISSUES)
+    missing_pvalue = False
 
     ### First check if p-value itself is present ###
     try:
         pval = line_cols[cols_i["pval"]]
         if is_null(pval) or not (0 <= float(pval) <= 1):
-            return None, MISSING_P_VALUE, issues
+            missing_pvalue = True
         pval = float(pval)
     except:
-        return None, MISSING_P_VALUE, issues
+        missing_pvalue = True
 
 
     ### Try getting all columns. If some not present, will throw ###
@@ -250,7 +252,7 @@ def check_row(line_cols: List[str]) -> Union[
 
     except:
         issues[INVALID_ROW] = True
-        return pval, INVALID_ENTRY, issues
+        return None, RowStatus.INVALID_P_VALUE, issues
 
     ### Check any reasons this SNP will be discarded later ###
 
@@ -337,11 +339,13 @@ def check_row(line_cols: List[str]) -> Union[
     #     return INVALID_ENTRY, pval
 
 
-    if any(issues):
-        return pval, INVALID_ENTRY, issues
+    if missing_pvalue:
+        return None, RowStatus.INVALID_P_VALUE, issues
     else:
-        # all good?
-        return pval, GOOD_ENTRY, issues
+        if any(issues):
+            return pval, RowStatus.INVALID, issues  # type: ignore
+        else:
+            return pval, RowStatus.GOOD, issues  # type: ignore
 
 
 
@@ -465,16 +469,16 @@ invalid_entry_bins_reason_bins = np.zeros((len(ticks), max(ISSUES)+1)).astype(in
 
 for line_i in range(len(SNPs_report)):
 
-    if SNPs_report[line_i] == MISSING_P_VALUE:
+    if SNPs_report[line_i] == RowStatus.INVALID_P_VALUE:
         missing_pval_bins[0] += 1
 
-    elif SNPs_report[line_i] == GOOD_ENTRY:
+    elif SNPs_report[line_i] == RowStatus.GOOD:
         for j in range(1,len(ticks)):
             if SNPs_pval[line_i] <= ticks[j]:
                 good_entry_bins[j] += 1
                 break
 
-    elif SNPs_report[line_i] == INVALID_ENTRY:
+    elif SNPs_report[line_i] == RowStatus.INVALID:
         for j in range(1, len(ticks)):
             if SNPs_pval[line_i] <= ticks[j]:
                 invalid_entry_bins[j] += 1
