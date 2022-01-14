@@ -475,16 +475,15 @@ invalid_entry_bins_reason_bins = np.zeros((len(ticks), max(ISSUES)+1)).astype(in
 
 for line_i in range(len(SNPs_report)):
 
-    if SNPs_report[line_i] == MISSING_P_VALUE:
-        missing_pval_bins[0] += 1
-
-    elif SNPs_report[line_i] == GOOD_ENTRY:
+    if SNPs_report[line_i] == GOOD_ENTRY:
         for j in range(1,len(ticks)):
             if SNPs_pval[line_i] <= ticks[j]:
                 good_entry_bins[j] += 1
                 break
 
-    elif SNPs_report[line_i] == INVALID_ENTRY:
+    elif SNPs_report[line_i] in [MISSING_P_VALUE, INVALID_ENTRY]:
+        if SNPs_report[line_i] == MISSING_P_VALUE:
+            missing_pval_bins[0] += 1
         for j in range(1, len(ticks)):
             if SNPs_pval[line_i] <= ticks[j]:
                 invalid_entry_bins[j] += 1
