@@ -209,7 +209,7 @@ def is_null(val: str) -> bool:
 def check_row(line_cols: List[str]) -> Union[
         # "good" entry
         Tuple[float, Literal[0], List[bool]],
-        # "missing p-value" entry
+        # "missing/invalid p-value" entry
         Tuple[None,  Literal[1], List[bool]],
         # "invalid" entry, having some issues (listed in the list)
         Tuple[float, Literal[2], List[bool]],
@@ -225,15 +225,18 @@ def check_row(line_cols: List[str]) -> Union[
     """
 
     issues = [False] * len(ISSUES)
+    missing_pvalue = False
 
     ### First check if p-value itself is present ###
+    pval = None
     try:
         pval = line_cols[cols_i["pval"]]
         if is_null(pval) or not (0 <= float(pval) <= 1):
-            return None, MISSING_P_VALUE, issues
+            missing_pvalue = True
         pval = float(pval)
     except:
-        return None, MISSING_P_VALUE, issues
+        pval = None
+        missing_pvalue = True
 
 
     ### Try getting all columns. If some not present, will throw ###
@@ -250,7 +253,11 @@ def check_row(line_cols: List[str]) -> Union[
 
     except:
         issues[INVALID_ROW] = True
-        return pval, INVALID_ENTRY, issues
+        if missing_pvalue:
+            return None, MISSING_P_VALUE, issues
+        else:
+            assert pval is not None
+            return pval, INVALID_ENTRY, issues # pval is None
 
     ### Check any reasons this SNP will be discarded later ###
 
@@ -336,12 +343,15 @@ def check_row(line_cols: List[str]) -> Union[
     # if null_entry(n) or not (0 < float(n)):
     #     return INVALID_ENTRY, pval
 
-
-    if any(issues):
-        return pval, INVALID_ENTRY, issues
+    if missing_pvalue:
+        return None, MISSING_P_VALUE, issues
     else:
-        # all good?
-        return pval, GOOD_ENTRY, issues
+        assert pval is not None
+        if any(issues):
+            return pval, INVALID_ENTRY, issues
+        else:
+            # all good?
+            return pval, GOOD_ENTRY, issues
 
 
 
@@ -499,10 +509,11 @@ if REPORT_ABS_DIR:
         os.makedirs(REPORT_ABS_DIR)
 
 
+issues_count_arr = np.sum(SNPs_issues, axis=0)
 issues_count: Dict[str, int] = {}
 
 for issue_i in range(0, len(ISSUES)):
-    issues_count[ISSUES_LABELS[issue_i]] = sum([invalid_entry_bins_reason_bins[i][issue_i] for i in range(len(invalid_entry_bins))])
+    issues_count[ISSUES_LABELS[issue_i]] = issues_count_arr[issue_i]
 
 issues_count["pval"] = sum(missing_pval_bins)
 
