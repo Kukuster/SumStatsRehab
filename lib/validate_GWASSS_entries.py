@@ -509,10 +509,11 @@ if REPORT_ABS_DIR:
         os.makedirs(REPORT_ABS_DIR)
 
 
+issues_count_arr = np.sum(SNPs_issues, axis=0)
 issues_count: Dict[str, int] = {}
 
 for issue_i in range(0, len(ISSUES)):
-    issues_count[ISSUES_LABELS[issue_i]] = sum([invalid_entry_bins_reason_bins[i][issue_i] for i in range(len(invalid_entry_bins))])
+    issues_count[ISSUES_LABELS[issue_i]] = issues_count_arr[issue_i]
 
 issues_count["pval"] = sum(missing_pval_bins)
 
