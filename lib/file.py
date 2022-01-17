@@ -85,7 +85,7 @@ def resolve_bare_text_file(maybe_archive_path: str, unpacked_text_file_path: str
     mime: str = magic.from_file(os.path.realpath(maybe_archive_path), mime=True)
 
     if mime == 'application/gzip' or mime == 'application/x-gzip':
-        print("the SS file is a gzip. Unpacking")
+        print("the SumStats file is a gzip. Unpacking")
         with gzip.open(maybe_archive_path, 'rb') as f_in:
             try:
                 with open(unpacked_text_file_path, 'wb') as f_out:
@@ -99,7 +99,7 @@ def resolve_bare_text_file(maybe_archive_path: str, unpacked_text_file_path: str
                 raise EOFError
         return unpacked_text_file_path
     elif mime == 'application/zip':
-        print("the SS file is a zip. Unpacking")
+        print("the SumStats file is a zip. Unpacking")
         with ZipFile(maybe_archive_path, 'r') as zipObj:
             # Extract all the contents of zip file in current directory
             extract_dir = os.path.dirname(os.path.abspath(maybe_archive_path))

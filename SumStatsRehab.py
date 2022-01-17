@@ -227,7 +227,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     FILE_FOR_FIXING = INPUT_GWAS_FILE_standard_sorted if required_sorting else INPUT_GWAS_FILE_standard
-    REHAB_OUTPUT_FILE = OUTPUT_FILE + '.SSrehabed.tsv'
+    REHAB_OUTPUT_FILE = OUTPUT_FILE + '.rehabed.tsv'
     ec = call(["python3",
             loop_fix,
             FILE_FOR_FIXING,
@@ -328,7 +328,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     FILE_FOR_FIXING = INPUT_GWAS_FILE_standard_sorted2 if required_sorting2 else REHAB_OUTPUT_FILE
-    REHAB2_OUTPUT_FILE = OUTPUT_FILE + '.SSrehabed-twice.tsv'
+    REHAB2_OUTPUT_FILE = OUTPUT_FILE + '.rehabed-twice.tsv'
     ec = call(["python3",
             loop_fix,
             FILE_FOR_FIXING,

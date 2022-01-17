@@ -1,4 +1,4 @@
-# SSrehab
+# SumStatsRehab
 
 ## dependencies:
  - python 3.8+
@@ -10,7 +10,7 @@
 ## Installation and basics
 1. clone this repo
 ```bash
-git clone https://github.com/Kukuster/SSrehab.git
+git clone https://github.com/Kukuster/SumStatsRehab.git
 ```
 2. install requirements
 ```bash
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 3. run the eponymous script in the cloned directory using the following syntax:
 ```bash
-python3 SSrehab.py <command> [keys]
+python3 SumStatsRehab.py <command> [keys]
 ```
 
 Use `diagnose` to check the validity of entries in the GWAS SS file.
@@ -60,7 +60,7 @@ NOTE: after preprocessing of the necessary dbSNPs is finished, these tools are n
 #### 3.2 Run preprocessing
 Run `prepare_dbSNPs` using the following syntax:
 ```bash
-python3 SSrehab.py prepare_dbSNPs --dbsnp DBSNP --OUTPUT OUTPUT --gz-sort GZ_SORT --bcftools BCFTOOLS
+python3 SumStatsRehab.py prepare_dbSNPs --dbsnp DBSNP --OUTPUT OUTPUT --gz-sort GZ_SORT --bcftools BCFTOOLS
                                   [--buffer BUFFER]
 ```
 where:
@@ -109,7 +109,7 @@ your config file should have the name `WojcikG_PMID_htn.gz.json` and the followi
 ```
 
 Notes:
- - SSrehab will only consider data from the columns which indices are specified in the config file. If one of the above columns is present in the SS file but wasn't specified in the config file, then SSrehab treats the column as missing.
+ - SumStatsRehab will only consider data from the columns which indices are specified in the config file. If one of the above columns is present in the SS file but wasn't specified in the config file, then SumStatsRehab treats the column as missing.
  - In this example, all the 10 columns from the list of supported columns are present. But none of the columns above are mandatory. If certain columns are missing, the `fix` command will attempt to restore them if possible.
 
 
@@ -123,7 +123,7 @@ If `diagnose` is ran without additional arguments, it is "read-only", i.e. doesn
 Run `diagnose` as follows:
 
 ```bash
-python3 SSrehab.py diagnose --INPUT INPUT_GWAS_FILE
+python3 SumStatsRehab.py diagnose --INPUT INPUT_GWAS_FILE
 ```
 where `INPUT_GWAS_FILE` is the path to the GWAS SS file with the corresponding config file at `*.json`
 
@@ -142,7 +142,7 @@ A bar chart is generated for each bin of the stacked histogram plot and reports 
 If a Linux system runs without GUI, the report should be saved on the file system. For this, run the command as follows:
 
 ```bash
-python3 SSrehab.py diagnose --INPUT INPUT_GWAS_FILE --REPORT-DIR REPORT_DIR
+python3 SumStatsRehab.py diagnose --INPUT INPUT_GWAS_FILE --REPORT-DIR REPORT_DIR
 ```
 where `REPORT_DIR` is an existing or not existing directory under which the generated report will be contained. When saved onto a disk, the report also includes a small table with exact numbers of invalid fields and other issues in the GWAS SS file.
 
@@ -151,7 +151,7 @@ Finally, a user may want to decide to run the `fix` command.
 
 A user should run the `fix` command as follows:
 ```bash
-python3 SSrehab.py fix --INPUT INPUT_GWAS_FILE --OUTPUT OUTPUT_FILE
+python3 SumStatsRehab.py fix --INPUT INPUT_GWAS_FILE --OUTPUT OUTPUT_FILE
                        [--dbsnp-1 DBSNP1_FILE] [--dbsnp-2 DBSNP2_FILE]
                        [--chain-file CHAIN_FILE]
                        [--freq-db FREQ_DATABASE_SLUG]
@@ -167,12 +167,12 @@ where:
 example:
 
 ```bash
-python3 SSrehab.py fix --INPUT "29559693.tsv" --OUTPUT "SSrehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED
+python3 SumStatsRehab.py fix --INPUT "29559693.tsv" --OUTPUT "SumStatsRehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED
 ```
 
 As the normal process of `fix`, a report will be generated for the input file, as well as for the file after each step of processing. Depending on the availability of invalid/missing data in the GWAS SS file and the input arguments, a different number of steps may be required for a complete run of the `fix` command, with 1 or 2 _loops_ performed on the GWAS SS file. All steps are performed automatically without prompt. The process of `fix`ing is represented in logging to the standard output and may take anywhere from 5 minutes to 1.5 hours, depending on the size of the file and the number of steps.
 
-As a result, if 1 loop was required to fix the file, then the resulting file will be available with the suffix `.SSrehabed.tsv`. If 2 loops were required, then the resulting file is available with the suffix `.SSrehabed-twice.tsv`.
+As a result, if 1 loop was required to fix the file, then the resulting file will be available with the suffix `.rehabed.tsv`. If 2 loops were required, then the resulting file is available with the suffix `.rehabed-twice.tsv`.
 
 The report made with a `diagnose` command will be available in a separate directory for:
  - the input file
@@ -185,11 +185,11 @@ The report made with a `diagnose` command will be available in a separate direct
 
 Please refer to the instructions by running
 ```bash
-python3 SSrehab.py -h
+python3 SumStatsRehab.py -h
 ```
 or
 ```bash
-python3 SSrehab.py <command> -h
+python3 SumStatsRehab.py <command> -h
 ```
 
 
@@ -208,17 +208,17 @@ python3 SSrehab.py <command> -h
  - upon execution of the `fix` command, a config file has to be generated with all the names of the intermediary files. This will improve refactoring into the actual pipeline.
  - (maybe) improve restoring alleles by adding checks for an exact match of flipped alleles if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory and is relevant only for restoring alleles by looping through the file sorted by Chr and BP.
  - add the ability to specify additional columns from the GWAS SS file that the user wants to include in the end file. This would be an array of integers in the json config file for the input GWAS SS file.
- - **improve code in the main file: `SSrehab.py`**
+ - **improve code in the main file: `SumStatsRehab.py`**
  - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
- - improve the interface for liftover. SSrehab fix should work for all sorts of liftovers between builds 36, 37, and 38, including back liftover. If the user omits the preprocessed dbSNP databases as input but specifies the chain file, it can perform liftover only.
+ - improve the interface for liftover. SumStatsRehab fix should work for all sorts of liftovers between builds 36, 37, and 38, including back liftover. If the user omits the preprocessed dbSNP databases as input but specifies the chain file, it can perform liftover only.
  - add support for OR, and, maybe, restoration of OR from beta or vice versa.
- - **add a keyword argument that will cause SSrehab fix to clean up all intermediate files and leave only the last resulting file after the processing.**
+ - **add a keyword argument that will cause SumStatsRehab fix to clean up all intermediate files and leave only the last resulting file after the processing.**
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
  - **add a WARNING that beta will be restored with an accurate sign only when the standard error is signed.**
- - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to test SSrehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
- - **make SSrehab installable via `pip`**
+ - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to test SumStatsRehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
+ - **make SumStatsRehab installable via `pip`**
  - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.
  - `diagnose` command script should also generate a bar chart for the bin with missing p-value
  - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
