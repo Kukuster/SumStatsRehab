@@ -550,9 +550,10 @@ def maybe_file_path_type(string: str):
 
 
 def main():
-    # version = "0.1.0"
+    version = "1.1.0-dev"
 
     p = argparse.ArgumentParser(description='GWAS summary statistics QC tool')
+    p.prog = 'SumStatsRehab'
     subparser = p.add_subparsers(dest='command')
     FIX_PARSER = subparser.add_parser('fix', help="diagnoses and tries to fix the file")
     PREPARE_DBSNPS_PARSER = subparser.add_parser('prepare_dbSNPs', help="prepares two DBs from the given dbSNP database. These two DBs are required for restoring rsID, chr, BP, alleles, and allele frequencies")
@@ -602,6 +603,8 @@ def main():
 
 
     args = p.parse_args()
+
+    print(f"{p.prog} {version} {args.command}")
 
     if args.command == 'fix':
         fix(args.INPUT_GWAS_FILE, args.OUTPUT_FILE,
