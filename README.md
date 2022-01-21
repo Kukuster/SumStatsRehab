@@ -10,14 +10,21 @@
 ## Installation and basics
 1. clone this repo
 ```bash
-git clone https://github.com/Kukuster/SumStatsRehab.git
+git clone https://github.com/Kukuster/SumStatsRehab.git && cd SumStatsRehab
 ```
+
 2. install requirements
 ```bash
 pip install -r requirements.txt
 ```
 
-3. run the eponymous script in the cloned directory using the following syntax:
+3. install SumStatsRehab as a package
+```bash
+python3 setup.py build
+python3 setup.py install
+```
+
+4. run the command using the following syntax:
 ```bash
 SumStatsRehab <command> [keys]
 ```
@@ -239,14 +246,12 @@ When `fix`ing, file is first formatted into this internal format. Output file is
 
 
 ### BACKLOG
- - upon execution of the `fix` command, a config file has to be generated with all the names of the intermediary files. This will improve refactoring into the actual pipeline.
  - (maybe) improve restoring alleles by adding checks for an exact match of flipped alleles if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory and is relevant only for restoring alleles by looping through the file sorted by Chr and BP.
  - add the ability to specify additional columns from the GWAS SS file that the user wants to include in the end file. This would be an array of integers in the json config file for the input GWAS SS file.
  - **improve code in the main file: `SumStatsRehab.py`**
  - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
  - improve the interface for liftover. SumStatsRehab fix should work for all sorts of liftovers between builds 36, 37, and 38, including back liftover. If the user omits the preprocessed dbSNP databases as input but specifies the chain file, it can perform liftover only.
  - add support for OR, and, maybe, restoration of OR from beta or vice versa.
- - **add a keyword argument that will cause SumStatsRehab fix to clean up all intermediate files and leave only the last resulting file after the processing.**
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
