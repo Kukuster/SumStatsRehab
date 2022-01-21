@@ -15,7 +15,7 @@ from lib.prepare_GWASSS_columns import prepare_GWASSS_columns
 from lib.validate_GWASSS_entries import validate_GWASSS_entries
 from lib.sort_GWASSS_by_ChrBP import sort_GWASSS_by_ChrBP
 from lib.sort_GWASSS_by_rsID import sort_GWASSS_by_rsID
-from lib.loop_fix import loop_fix
+from lib.loop_fix import loop_fix, ActivatedResolvers
 from lib.report_utils import read_report_from_dir
 from lib.standard_column_order import STANDARD_COLUMN_ORDER
 from lib.env import get_build, set_build
@@ -41,6 +41,37 @@ def perc(x, total):
         return str(round((x/total)*100, 2)) + "%"
 
 
+class brag:
+    def all_issues_resolved(self, OUTPUT_FILE: str, total_entries: int):
+        print(f"All issues with all data points have been resolved!")
+        print(f"all {total_entries} SNP entries are good")
+        print(f" see fixed file at: \"{OUTPUT_FILE}\"")
+
+    def all_which_can_be_solved_is_resolved(self, OUTPUT_FILE: str):
+        print(f"Those issues which were possible to resolve have been resolved")
+        print(f" see fixed file at: \"{OUTPUT_FILE}\"")
+
+    def the_input_file_has_no_issues(self, OUTPUT_FILE: str, total_entries: int):
+        print(f"The input summary statistics file doesn't seem to have any issues!")
+        print(f"all {total_entries} SNPs are good")
+        print(f" see formatted file at: \"{OUTPUT_FILE}\"")
+
+    def the_input_file_has_nothing_to_resolve(self, OUTPUT_FILE: str):
+        print(f"The input file has nothing else to resolve")
+        print(f" see formatted file at: \"{OUTPUT_FILE}\"")
+
+BRAG = brag()
+
+class inform:
+    def this_number_of_ChrBP_lost_after_liftover(self, Chr_lost: int, BP_lost: int, total_entries: int):
+        if Chr_lost > 0:
+            print(f"lost {Chr_lost} ({perc(Chr_lost,total_entries)}) \"Chr\" fields")
+        if BP_lost > 0:
+            print(f"lost {BP_lost}  ({perc(BP_lost, total_entries)}) \"BP\" fields")
+
+INFORM = inform()
+        
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                                                 #
@@ -50,7 +81,23 @@ def perc(x, total):
 
 
 
-def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: str, CHAIN_FILE: str, FREQ_DATABASE_SLUG: str):
+def fix(INPUT_GWAS_FILE: str,
+        OUTPUT_FILE: str,
+        dbSNP_FILE: str,
+        dbSNP2_FILE: str,
+        CHAIN_FILE: str,
+        FREQ_DATABASE_SLUG: str,
+        ACTIVATED_RESOLVERS: Dict[str, bool] = {
+            "ChrBP": True,
+            "rsID":  True,
+            "OA":    True,
+            "EA":    True,
+            "EAF":   True,
+            "beta":  False,
+            "SE":    True,
+            "pval":  True,
+        },
+    ):
 
     ### PROCESS INPUT ###
     INPUT_GWAS_FILE = str(INPUT_GWAS_FILE)
@@ -60,6 +107,25 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     dbSNP2_FILE = str(dbSNP2_FILE)
     CHAIN_FILE = str(CHAIN_FILE)
     FREQ_DATABASE_SLUG = str(FREQ_DATABASE_SLUG)
+    ACTIVATED_RESOLVERS = ActivatedResolvers(ACTIVATED_RESOLVERS)
+
+
+    ### declare shortcut functions ###
+    issues: Dict[str, int]
+    
+    def gonna_resolve(field: str):
+        if field in ('Chr', 'BP'):
+            return issues[field] and ACTIVATED_RESOLVERS['ChrBP'] # Chr and BP are always resolved together
+        else:
+            return issues[field] and ACTIVATED_RESOLVERS[field]
+    
+    def any_issues_to_resolve(issues: Dict[str, int]):
+        issues_to_resolve: Dict[str, int] = {}
+        for issue, issue_count in issues.items():
+            if issue_count > 0 and gonna_resolve(issue):
+                issues_to_resolve[issue] = True
+        return any(issues_to_resolve.values())
+
 
 
     ### Set the environment varaible for the build ###
@@ -111,16 +177,22 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
     required_sorting: bool = False
     required_liftover: bool = False
+    ChrBP_lost_because_of_liftover: int = 0
     sorted_by: Literal[None, 'rsID', 'ChrBP'] = None
     INPUT_GWAS_FILE_standard_sorted = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted.tsv"
     INPUT_GWAS_FILE_standard_lifted = remove_last_ext(INPUT_GWAS_FILE) + "_standard_lifted.tsv"
+    INPUT_GWAS_FILE_prepared: str = INPUT_GWAS_FILE_standard
 
 
-    if get_build() != 'hg38' and CHAIN_FILE and CHAIN_FILE != "None" and issues['BP']<total_entries and issues['Chr']<total_entries:
+    if get_build() != 'hg38' and \
+        CHAIN_FILE and \
+        CHAIN_FILE != "None" and \
+        issues['BP']<total_entries and \
+        issues['Chr']<total_entries:
         # if either BP or Chr is fully missing,
         # there's no need for liftover since those will be restored with dbSNPs in the target build
         required_liftover = True
-        loop_fix(
+        ChrBP_lost_because_of_liftover = loop_fix(
             INPUT_GWAS_FILE_standard,
             input_validation_report_dir,
             INPUT_GWAS_FILE_standard_lifted,
@@ -130,6 +202,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
             sorted_by if sorted_by else None,
         )
+        INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_lifted
 
         print("finished liftover to hg38 (saved report)")
         set_build('hg38')
@@ -141,8 +214,9 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             input_lifted_validation_report_dir,
         )
     
-    if (issues['BP'] or issues['Chr']) and issues['rsID']<total_entries:
-        # here if some alleles are invalid, they will be attempted to be restored by rsID, which is better then by ChrBP
+    if (gonna_resolve('BP') or gonna_resolve('Chr')) and issues['rsID']<total_entries:
+        # here if some alleles are invalid, they will be attempted to be restored by rsID,
+        # which is better then by ChrBP
         required_sorting = True
         sorted_by = 'rsID'
         for col in ('Chr', 'BP'):
@@ -153,9 +227,15 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
         )
+        INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_sorted
         print(f"Sorted by rsID")
 
-    elif (issues['rsID'] or issues['OA'] or issues['EA']) and issues['Chr']<total_entries and issues['BP']<total_entries:
+    elif (gonna_resolve('rsID') or gonna_resolve('OA') or gonna_resolve('EA')) and \
+        issues['Chr']<total_entries and issues['BP']<total_entries:
+        # however if anyway going to restore any alleles and either:
+        #  - all rsIDs are missing, or 
+        #  - if going to restore rsID too
+        # then sort by ChrBP and those will be restored from Chr and BP
         required_sorting = True
         sorted_by = 'ChrBP'
         for col in ('rsID', 'OA', 'EA'):
@@ -166,14 +246,34 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
         )
+        INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_sorted
         print(f"Sorted by Chr and BP")
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
-    if not any(issues.values()):
-        print(f"The input summary statistics file has not been identified to have any issues!")
-        print(f"all {total_entries} SNPs are good")
+
+    if not any(issues.values()) and not ChrBP_lost_because_of_liftover:
+        BRAG.the_input_file_has_no_issues(
+            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
+            total_entries = total_entries,
+        )
         return
+    elif not any(issues.values()) and ChrBP_lost_because_of_liftover:
+        INFORM.this_number_of_ChrBP_lost_after_liftover(
+            Chr_lost=ChrBP_lost_because_of_liftover,
+             BP_lost=ChrBP_lost_because_of_liftover,
+            total_entries=total_entries,
+        )
+        BRAG.the_input_file_has_nothing_to_resolve(
+            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
+        )
+        return
+    elif not any_issues_to_resolve(issues):
+        BRAG.the_input_file_has_nothing_to_resolve(
+            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
+        )
+        return
+
 
 
     ##### 4 #####
@@ -181,7 +281,7 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     print(f'=== Step {i_step}: REHAB: loopping through the GWAS SS file and fixing entries ===')
     start_time = time.time()
 
-    FILE_FOR_FIXING = INPUT_GWAS_FILE_standard_sorted if required_sorting else INPUT_GWAS_FILE_standard
+    FILE_FOR_FIXING = INPUT_GWAS_FILE_prepared
     REHAB_OUTPUT_FILE = OUTPUT_FILE + '.rehabed.tsv'
     loop_fix(
         FILE_FOR_FIXING,
@@ -227,13 +327,17 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
                     print(f"lost {-issues_solved[col]} ({perc(-issues_solved[col], total_entries)}) \"{col}\" fields after liftover")
                 else:
                     print(f"lost {-issues_solved[col]} ({perc(-issues_solved[col], total_entries)}) \"{col}\" fields")
-            else:
+            else: # issues_solved[col] > 0:
                 print(f"restored {issues_solved[col]} ({perc(issues_solved[col], total_entries)}) \"{col}\" fields")
 
     INPUT_GWAS_FILE_standard_sorted2 = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted2.tsv"
 
     required_sorting2: bool = False
-    if sorted_by != 'ChrBP' and (issues_REHABed['rsID'] or issues_REHABed['OA'] or issues_REHABed['EA']):
+    if sorted_by != 'ChrBP' and (issues_REHABed['rsID'] or issues_REHABed['OA'] or issues_REHABed['EA']) and \
+        (not issues['Chr']==total_entries and not issues['BP']==total_entries):
+        # if either rsID, OA, or EA are missing, we can try sorting by ChrBP to restore them.
+        # But if Chr or BP was totally missing at first, it won't help to try this
+
         required_sorting2 = True
         sorted_by = 'ChrBP'
         for col in ('rsID', 'OA', 'EA'):
@@ -249,16 +353,18 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
     if not any(issues_REHABed.values()):
-        print(f"All issues with all data points have been resolved!")
-        print(f"all {total_entries} SNP entries are good")
-        print(f"see fixed file at: \"{REHAB_OUTPUT_FILE}\"")
+        BRAG.all_issues_resolved(
+            OUTPUT_FILE = REHAB_OUTPUT_FILE,
+            total_entries = total_entries,
+        )
         return
 
     if not required_sorting2:
         # if the file doesn't require any other sorting,
         # then with the current sorting everything that could be restored is already restored
-        print(f"Those issues which were possible to resolve have been resolved")
-        print(f"see fixed file at: \"{REHAB_OUTPUT_FILE}\"")
+        BRAG.all_which_can_be_solved_is_resolved(
+            OUTPUT_FILE = REHAB_OUTPUT_FILE,
+        )
         return
 
 
@@ -316,14 +422,17 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
-    if not any(issues.values()):
-        print(f"The twice REHABed summary statistics file has not been identified to have any issues!")
-        print(f"all {total_entries} SNPs are good")
-        print(f"see fixed file at: \"{REHAB2_OUTPUT_FILE}\"")
+    if not any(issues_REHABed_twice.values()):
+        BRAG.all_issues_resolved(
+            OUTPUT_FILE = REHAB2_OUTPUT_FILE,
+            total_entries = total_entries,
+        )
         return
     else:
-        print(f"Those issues which were possible to resolve have been resolved")
-        print(f"see fixed file at: \"{REHAB2_OUTPUT_FILE}\"")
+        BRAG.all_which_can_be_solved_is_resolved(
+            OUTPUT_FILE = REHAB2_OUTPUT_FILE,
+        )
+        return
 
 
 
@@ -517,6 +626,7 @@ def main():
     print(f"{p.prog} {version} {args.command}")
 
     if args.command == 'fix':
+        # print("WARNING: if standard error field is provided without a sign, then restored beta will be unsigned.")
         fix(args.INPUT_GWAS_FILE, args.OUTPUT_FILE,
             args.dbSNP1_FILE, args.dbSNP2_FILE, args.CHAIN_FILE, args.FREQ_DATABASE_SLUG)
 

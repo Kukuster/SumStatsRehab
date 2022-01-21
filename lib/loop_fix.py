@@ -22,15 +22,37 @@ def file_exists(path: str):
         return os.path.isfile(path)
 
 
+class defaultTrueDict(dict):
+    def __missing__(self, key):
+        return True
+
+class ActivatedResolvers(defaultTrueDict):
+    pass
+
+class kukdefaultdict(dict):
+    def __missing__(self, key):
+        return key
+
+
 def loop_fix(
     GWAS_FILE: str,
     REPORT_DIR: str,
     OUTPUT_GWAS_FILE: str,
     SNPs_FILE: str,
     SNPs_rsID_FILE: str,
-    CHAIN_FILE: str,
+    CHAIN_FILE: Union[None, str],
     FREQ_DATABASE_SLUG: Union[None, str],
-    GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None
+    GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None,
+    ACTIVATED_RESOLVERS: Dict[str, bool] = {
+        "ChrBP": True,
+        "rsID":  True,
+        "OA":    True,
+        "EA":    True,
+        "EAF":   True,
+        "beta":  False,
+        "SE":    True,
+        "pval":  True,
+    }
 ):
     """
     Loop through the GWAS_FILE file once and try fixing some.
@@ -53,8 +75,8 @@ def loop_fix(
     SNPs_rsID_FILE : str
         preprocessed dbSNP2 file, or "None"
     
-    CHAIN_FILE : str
-        chain file for liftover from build 36 or 37 to build 38, or "None"
+    CHAIN_FILE : None | str
+        chain file for liftover from build 36 or 37 to build 38, or None to disable liftover
     
     FREQ_DATABASE_SLUG : None | str
         frequency database slug (e.g.: "GnomAD", "dbGaP_PopFreq", "TOMMO"), "None", or None
@@ -62,7 +84,16 @@ def loop_fix(
     GWAS_SORTING : None | 'rsID' | 'ChrBP'
         (optional) Either "rsID" or "ChrBP". Denotes the sorting of the input GWAS SS file
 
+    ACTIVATED_RESOLVERS : Dict[str, bool]
+        Dictionary that assigns boolean value to restorable columns to activate/deactivate restoration of a particular column.
+        By default, if not set, column data will be attempted to be restored.
+        
+        Keys are the same as the column keys used in json config for the file,
+        except columns 'Chr' and 'BP' are always restored together, so 'ChrBP' should be used here instead.
+        To deactivate liftover resolver, set CHAIN_FILE to None
     """
+
+    ACTIVATED_RESOLVERS = ActivatedResolvers(ACTIVATED_RESOLVERS)
 
     if FREQ_DATABASE_SLUG == 'None' or FREQ_DATABASE_SLUG is None:
         FREQ_DATABASE_SLUG = None
@@ -98,9 +129,6 @@ def loop_fix(
     '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
     '21', '22', '23', 'X', 'x', 'Y', 'y', 'M', 'm']
 
-    class kukdefaultdict(dict):
-        def __missing__(self, key):
-            return key
     CHR_ORDER = kukdefaultdict() # if unknown key was passed, returns the key itself
     CHR_ORDER['1']  = 1
     CHR_ORDER['01'] = 1 #
@@ -447,10 +475,10 @@ def loop_fix(
         Depending on the REF and ALT (from the dbSNP), decides which one is the allele that's present,
         and restores the other one in accord.
         """
-        if   is_valid_EA(fields) and not is_valid_OA(fields):
+        if   is_valid_EA(fields) and not is_valid_OA(fields) and ACTIVATED_RESOLVERS['OA']:
             MA = 'OA'  # missing allele
             PA = 'EA'  # present allele
-        elif is_valid_OA(fields) and not is_valid_EA(fields):
+        elif is_valid_OA(fields) and not is_valid_EA(fields) and ACTIVATED_RESOLVERS['EA']:
             MA = 'EA'  # missing allele
             PA = 'OA'  # present allele
         else:
@@ -512,6 +540,7 @@ def loop_fix(
         list of entries in a row
     """
 
+    ChrBP_lost_because_of_liftover = 0
     def resolve_build38(fields, converter):
         """
         Will use the input converter dictionary to liftover
@@ -528,6 +557,8 @@ def loop_fix(
             except:
                 fields[cols_i["Chr"]] = '.'
                 fields[cols_i["BP"]] = '.'
+                nonlocal ChrBP_lost_because_of_liftover
+                ChrBP_lost_because_of_liftover += 1
 
 
     def resolve_rsID(fields, SNPs_FILE_o):
@@ -685,11 +716,19 @@ def loop_fix(
 
     issues, total_entries = read_report_from_dir(REPORT_DIR)
 
+    def gonna_resolve(field: str):
+        if field in ('Chr', 'BP'):
+            return issues[field] and ACTIVATED_RESOLVERS['ChrBP'] # Chr and BP are always resolved together
+        else:
+            return issues[field] and ACTIVATED_RESOLVERS[field]
+
+
+
     DOING_LIFTOVER: bool = False
 
     current_build = get_build()
     converter = None
-    if current_build != 'hg38' and file_exists(CHAIN_FILE):
+    if current_build != 'hg38' and CHAIN_FILE is not None and file_exists(CHAIN_FILE):
         DOING_LIFTOVER = True
 
     if DOING_LIFTOVER:
@@ -699,7 +738,13 @@ def loop_fix(
         resolvers_args.append([converter])
 
 
-    if not DOING_LIFTOVER and GWAS_SORTING == 'rsID' and (issues['Chr'] or issues['BP'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_rsID_FILE):
+    if not DOING_LIFTOVER and GWAS_SORTING == 'rsID' and (
+            gonna_resolve('Chr') or
+            gonna_resolve('BP') or
+            gonna_resolve('OA') or
+            gonna_resolve('EA') or
+            gonna_resolve('EAF')
+        ) and file_exists(SNPs_rsID_FILE):
         """
         This ChrBP resolver assumes GWAS SS file is sorted by rsID
         """
@@ -711,7 +756,12 @@ def loop_fix(
         resolvers_args.append([SNPs_rsID_FILE_o])
 
 
-    if not DOING_LIFTOVER and GWAS_SORTING == 'ChrBP' and (issues['rsID'] or issues['OA'] or issues['EA'] or issues['EAF']) and file_exists(SNPs_FILE):
+    if not DOING_LIFTOVER and GWAS_SORTING == 'ChrBP' and (
+            gonna_resolve('rsID') or
+            gonna_resolve('OA') or
+            gonna_resolve('EA') or
+            gonna_resolve('EAF')
+        ) and file_exists(SNPs_FILE):
         """
         These resolvers assumes GWAS SS file is sorted by Chr and BP in accord to the SNPs file
         """
@@ -722,15 +772,15 @@ def loop_fix(
         resolvers_args.append([SNPs_FILE_o])
 
 
-    if issues['SE'] and issues['beta']<total_entries and issues['pval']<total_entries:
+    if gonna_resolve('SE')   and issues['beta']<total_entries and issues['pval']<total_entries:
         resolvers.append(resolve_SE)
         resolvers_args.append([])
 
-    if issues['beta'] and issues['SE']<total_entries and issues['pval']<total_entries:
+    if gonna_resolve('beta') and issues['SE']<total_entries   and issues['pval']<total_entries:
         resolvers.append(resolve_beta)
         resolvers_args.append([])
 
-    if issues['pval'] and issues['beta']<total_entries and issues['SE']<total_entries:
+    if gonna_resolve('pval') and issues['beta']<total_entries and issues['SE']<total_entries:
         resolvers.append(resolve_pval)
         resolvers_args.append([])
 
@@ -763,6 +813,7 @@ def loop_fix(
     OUTPUT_GWAS_FILE_o.close()
 
 
+    return ChrBP_lost_because_of_liftover
 
 
 
