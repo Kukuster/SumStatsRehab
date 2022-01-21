@@ -1,6 +1,7 @@
 # standard library
 import sys
 from typing import Dict, Union
+from collections import OrderedDict
 import json
 import os
 
@@ -43,9 +44,27 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
     #
 
     cols_i: Dict[str, int] = {}
+    input_cols_i_with_avg: Dict[str, Dict[Union[int, str], Union[int, float]]] = {}
+    parsed_cols_i_with_avg: Dict[str, Dict[int, float]] = {}
     for key, value in config.items():
-        if isinstance(key, str) and isinstance(value, int):
-            cols_i[key] = value
+        if isinstance(key, str):
+            if isinstance(value, int):
+                cols_i[key] = value
+            elif key == 'EAF' and isinstance(value, dict):
+                input_cols_i_with_avg[key] = value
+    
+    # validate json object format and parse numbers at the same time
+    for key, value in input_cols_i_with_avg.items():
+        try:
+            for col, weight in value.items():
+                if key not in parsed_cols_i_with_avg.keys():
+                    parsed_cols_i_with_avg[key] = {}
+                parsed_cols_i_with_avg[key][int(col)] = float(weight)
+        except ValueError as e:
+            print(e)
+            raise ValueError(f"Invalid json configuration for column: {key}."+
+            "Weighted average configuration has to be an object mapping column indices (int) to weights (numbers)")
+
 
 
     #
@@ -78,10 +97,73 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
                 chrom_col_fd = f"<( "
                 chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
                 chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' ; "
-                chrom_col_fd += ")"
+                chrom_col_fd += f" )"
                 BASH_CMD.append(chrom_col_fd)
             else:
                 BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
+
+        elif col_name in parsed_cols_i_with_avg.keys():
+            cols_obj = parsed_cols_i_with_avg[col_name]
+            # user may have specified multiple columns with corresponding weights using syntax:
+            # "EAF": {
+            #    4: 35653,
+            #    5: 25624
+            # }
+            # which denotes that column EAF should be a weighted average of columns 4 and 5,
+            # with corresponding the weights
+
+            shifted_cols_obj: OrderedDict[int, float] = OrderedDict({})
+            for col_i, weight in cols_obj.items():
+                shifted_cols_obj[col_i+1] = weight
+            
+            col_indices_for_cut = ",".join(map(str, shifted_cols_obj.keys()))
+            col_weights_for_awk = " ".join(map(str, shifted_cols_obj.values()))
+            
+            avg_col_df = f"<( "
+            avg_col_df += f"""echo {col_name}_rehab ;
+            tail -n +2 \"{BARE_GWAS_FILE}\" | cut -d$'\t' -f{col_indices_for_cut} | \\
+                awk -F$'\t' '
+                    # see answer https://unix.stackexchange.com/a/363471/387925
+                    # on question https://unix.stackexchange.com/questions/281271/can-i-determine-type-of-an-awk-variable
+                    function typeof(obj,   q, x, z){{
+                        q = CONVFMT
+                        CONVFMT = "% g"
+                            split(" " obj "\1" obj, x, "\1")
+                            x[1] = obj == x[1]
+                            x[2] = obj == x[2]
+                            x[3] = obj == 0
+                            x[4] = obj "" == +obj
+                        CONVFMT = q
+                        z["0001"] = z["1101"] = z["1111"] = "number"
+                        z["0100"] = z["0101"] = z["0111"] = "string"
+                        z["1100"] = z["1110"] = "strnum"
+                        z["0110"] = "undefined"
+                        return z[x[1] x[2] x[3] x[4]]
+                    }}
+                    BEGIN{{
+                        split("{col_weights_for_awk}", weights, " ")
+
+                        divisor = 0
+                        for(i=1; i<=length(weights); i++)
+                            divisor += weights[i];
+                    }}
+                    {{
+                        rowsum=0
+                        for(i=1;i<=NF;i++){{
+                            if (typeof($i) == "number" || typeof($i) == "strnum"){{
+                                rowsum += $i * weights[i]
+                            }} else {{
+                                print "."
+                                next
+                            }}
+                        }}
+                        print rowsum/divisor
+                    }}
+                '
+            """
+            avg_col_df += f" )"
+            BASH_CMD.append(avg_col_df)
+
         else:
             # if user didn't specify index for the column, a template column is added (header only)
             # in this case, paste(1) will leave such columns empty, i.e. values are the empty string

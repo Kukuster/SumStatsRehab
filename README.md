@@ -196,6 +196,37 @@ SumStatsRehab <command> -h
 
 ## NOTES
 
+### config file
+Config file is a json object which supports the following properties:
+ - `"Chr"`
+ - `"BP"`
+ - `"rsID"`
+ - `"EA"`
+ - `"OA"`
+ - `"EAF"`
+ - `"beta"`
+ - `"SE"`
+ - `"pval"`
+ - `"N"`
+ - `"INFO"`
+should be evaluated to an integer: the corresponding column index starting from 0.
+
+And 
+ - `"build"`
+should be evaluated to either one of the following (case insensitive): `'hg38'`, `'GRCh38'`, `'hg19'`, `'GRCh37'`, `'hg18'`, `'ncbi36'`.
+
+It is also possible to set `EAF` to a weighted average of multiple colums. E.g. if there are separate freq. columns for case and control groups, and average freq. is needed, number of participants in each group will serve as weights for the two columns:
+```
+{
+    "EAF": {
+        "4": 1001,
+        "5": 2500
+    },
+}
+```
+
+
+
 ### "standard" format
 When `fix`ing, file is first formatted into this internal format. Output file is also in this format.
 
