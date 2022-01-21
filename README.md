@@ -3,9 +3,9 @@
 ## dependencies:
  - python 3.8+
  - a GNU/Linux with bash v4 or 5.
- - python packages in `requirements.txt`
- - [bcftools](https://github.com/samtools/bcftools) (only for `prepare_dbSNPs`)
- - [gz-sort](http://kmkeen.com/gz-sort/) (only for `prepare_dbSNPs`)
+ - several python packages in `requirements.txt`
+ - [bcftools](https://github.com/samtools/bcftools) (only for the `prepare_dbSNPs` command)
+ - [gz-sort](http://kmkeen.com/gz-sort/) (only for the `prepare_dbSNPs` command)
 
 ## Installation and basics
 1. clone this repo
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 3. run the eponymous script in the cloned directory using the following syntax:
 ```bash
-python3 SumStatsRehab.py <command> [keys]
+SumStatsRehab <command> [keys]
 ```
 
 Use `diagnose` to check the validity of entries in the GWAS SS file.
@@ -60,7 +60,7 @@ NOTE: after preprocessing of the necessary dbSNPs is finished, these tools are n
 #### 3.2 Run preprocessing
 Run `prepare_dbSNPs` using the following syntax:
 ```bash
-python3 SumStatsRehab.py prepare_dbSNPs --dbsnp DBSNP --OUTPUT OUTPUT --gz-sort GZ_SORT --bcftools BCFTOOLS
+SumStatsRehab prepare_dbSNPs --dbsnp DBSNP --OUTPUT OUTPUT --gz-sort GZ_SORT --bcftools BCFTOOLS
                                   [--buffer BUFFER]
 ```
 where:
@@ -123,7 +123,7 @@ If `diagnose` is ran without additional arguments, it is "read-only", i.e. doesn
 Run `diagnose` as follows:
 
 ```bash
-python3 SumStatsRehab.py diagnose --INPUT INPUT_GWAS_FILE
+SumStatsRehab diagnose --INPUT INPUT_GWAS_FILE
 ```
 where `INPUT_GWAS_FILE` is the path to the GWAS SS file with the corresponding config file at `*.json`
 
@@ -142,7 +142,7 @@ A bar chart is generated for each bin of the stacked histogram plot and reports 
 If a Linux system runs without GUI, the report should be saved on the file system. For this, run the command as follows:
 
 ```bash
-python3 SumStatsRehab.py diagnose --INPUT INPUT_GWAS_FILE --REPORT-DIR REPORT_DIR
+SumStatsRehab diagnose --INPUT INPUT_GWAS_FILE --REPORT-DIR REPORT_DIR
 ```
 where `REPORT_DIR` is an existing or not existing directory under which the generated report will be contained. When saved onto a disk, the report also includes a small table with exact numbers of invalid fields and other issues in the GWAS SS file.
 
@@ -151,7 +151,7 @@ Finally, a user may want to decide to run the `fix` command.
 
 A user should run the `fix` command as follows:
 ```bash
-python3 SumStatsRehab.py fix --INPUT INPUT_GWAS_FILE --OUTPUT OUTPUT_FILE
+SumStatsRehab fix --INPUT INPUT_GWAS_FILE --OUTPUT OUTPUT_FILE
                        [--dbsnp-1 DBSNP1_FILE] [--dbsnp-2 DBSNP2_FILE]
                        [--chain-file CHAIN_FILE]
                        [--freq-db FREQ_DATABASE_SLUG]
@@ -167,7 +167,7 @@ where:
 example:
 
 ```bash
-python3 SumStatsRehab.py fix --INPUT "29559693.tsv" --OUTPUT "SumStatsRehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED
+SumStatsRehab fix --INPUT "29559693.tsv" --OUTPUT "SumStatsRehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED
 ```
 
 As the normal process of `fix`, a report will be generated for the input file, as well as for the file after each step of processing. Depending on the availability of invalid/missing data in the GWAS SS file and the input arguments, a different number of steps may be required for a complete run of the `fix` command, with 1 or 2 _loops_ performed on the GWAS SS file. All steps are performed automatically without prompt. The process of `fix`ing is represented in logging to the standard output and may take anywhere from 5 minutes to 1.5 hours, depending on the size of the file and the number of steps.
@@ -185,17 +185,19 @@ The report made with a `diagnose` command will be available in a separate direct
 
 Please refer to the instructions by running
 ```bash
-python3 SumStatsRehab.py -h
+SumStatsRehab -h
 ```
 or
 ```bash
-python3 SumStatsRehab.py <command> -h
+SumStatsRehab <command> -h
 ```
 
 
 ## NOTES
 
 ### "standard" format
+When `fix`ing, file is first formatted into this internal format. Output file is also in this format.
+
  - file is in the tsv format, i.e. tabular tab-separated format (bare, zipped, or gzipped)
  - there's a one-line header in the file on the first line. All other lines are the data entries
  - the file has precisely columns defined as `STANDARD_COLUMN_ORDER` in `lib/standard_column_order.py`.
@@ -222,3 +224,4 @@ python3 SumStatsRehab.py <command> -h
  - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.
  - `diagnose` command script should also generate a bar chart for the bin with missing p-value
  - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
+ - **add the following logic for restoring MAF: if the DB specifies allele frequency for all alleles except one (dot '.'), then it should calculated as 1 minus frequency of other alleles instead of leaving a dot**

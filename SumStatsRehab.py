@@ -10,28 +10,16 @@ import argparse
 import pathlib
 
 # local
-from lib.validate_utils import read_report_from_dir
+from lib.prepare_two_dbSNPs import prepare_two_dbSNPs
+from lib.prepare_GWASSS_columns import prepare_GWASSS_columns
+from lib.validate_GWASSS_entries import validate_GWASSS_entries
+from lib.sort_GWASSS_by_ChrBP import sort_GWASSS_by_ChrBP
+from lib.sort_GWASSS_by_rsID import sort_GWASSS_by_rsID
+from lib.loop_fix import loop_fix
+from lib.report_utils import read_report_from_dir
 from lib.standard_column_order import STANDARD_COLUMN_ORDER
 from lib.env import get_build, set_build
 
-
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # #
-#                                                 #
-#                    CONSTANTS                    #
-#                                                 #
-# # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# define paths to libs
-the_dir = os.path.dirname(inspect.getfile(inspect.currentframe())) or os.getcwd()  # type: ignore
-lib_dir = the_dir + "/lib"
-prepare_two_dbSNPs = lib_dir+"/prepare_two_dbSNPs.py"
-prepare_GWASSS_columns = lib_dir+"/prepare_GWASSS_columns.py"
-validate_GWASSS_entries = lib_dir+"/validate_GWASSS_entries.py"
-sort_GWASSS_by_ChrBP = lib_dir+"/sort_GWASSS_by_ChrBP.py"
-sort_GWASSS_by_rsID = lib_dir+"/sort_GWASSS_by_rsID.py"
-loop_fix = lib_dir+"/loop_fix.py"
 
 
 
@@ -93,17 +81,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     INPUT_GWAS_FILE_standard = remove_last_ext(INPUT_GWAS_FILE) + "_standard.tsv"
-    ec = call(["python3",
-            prepare_GWASSS_columns,
-            INPUT_GWAS_FILE,
-            INPUT_GWAS_FILE_standard,
-            ])
+    prepare_GWASSS_columns(
+        INPUT_GWAS_FILE,
+        INPUT_GWAS_FILE_standard,
+    )
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: prepare_GWASSS_columns script finished with exit code: {ec}")
-        exit(11)
-
 
 
     ##### 2 #####
@@ -112,18 +94,12 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     input_validation_report_dir = INPUT_GWAS_FILE + "_input-report"
-    ec = call(["python3",
-            validate_GWASSS_entries,
-            INPUT_GWAS_FILE_standard,
-            "standard",
-            input_validation_report_dir,
-            ])
+    validate_GWASSS_entries(
+        INPUT_GWAS_FILE_standard,
+        "standard",
+        input_validation_report_dir,   
+    )
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-        exit(12)
-
 
 
     ##### 3 #####
@@ -144,35 +120,26 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
         # if either BP or Chr is fully missing,
         # there's no need for liftover since those will be restored with dbSNPs in the target build
         required_liftover = True
-        ec = call(["python3",
-                loop_fix,
-                INPUT_GWAS_FILE_standard,
-                input_validation_report_dir,
-                INPUT_GWAS_FILE_standard_lifted,
-                dbSNP_FILE,
-                dbSNP2_FILE,
-                CHAIN_FILE,
-                FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-                sorted_by if sorted_by else ''
-                ])
-
-        if ec != 0:
-            print(f"ERROR: loop_fix (liftover) script finished with exit code: {ec}")
-            exit(13)
+        loop_fix(
+            INPUT_GWAS_FILE_standard,
+            input_validation_report_dir,
+            INPUT_GWAS_FILE_standard_lifted,
+            dbSNP_FILE,
+            dbSNP2_FILE,
+            CHAIN_FILE,
+            FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
+            sorted_by if sorted_by else None,
+        )
 
         print("finished liftover to hg38 (saved report)")
         set_build('hg38')
 
         input_lifted_validation_report_dir = INPUT_GWAS_FILE + "_input-lifted-report"
-        ec = call(["python3",
-            validate_GWASSS_entries,
+        validate_GWASSS_entries(
             INPUT_GWAS_FILE_standard_lifted,
             "standard",
             input_lifted_validation_report_dir,
-            ])
-        if ec != 0:
-            print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-            exit(13)
+        )
     
     if (issues['BP'] or issues['Chr']) and issues['rsID']<total_entries:
         # here if some alleles are invalid, they will be attempted to be restored by rsID, which is better then by ChrBP
@@ -182,15 +149,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             if issues[col]:
                 print(f"{issues[col]}/{total_entries} entries are missing {col}")
         print(f"Going to sort the GWAS SS file by rsID")
-        ec = call(["python3",
-            sort_GWASSS_by_rsID,
+        sort_GWASSS_by_rsID(
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
-            ])
-        if ec == 0:
-            print(f"Sorted by rsID")
-        else:
-            print(f"ERROR: sort_GWASSS_by_rsID script finished with exit code: {ec}")
+        )
+        print(f"Sorted by rsID")
 
     elif (issues['rsID'] or issues['OA'] or issues['EA']) and issues['Chr']<total_entries and issues['BP']<total_entries:
         required_sorting = True
@@ -199,26 +162,18 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             if issues[col]:
                 print(f"{issues[col]}/{total_entries} entries are missing {col}")
         print(f"Going to sort the GWAS SS file by Chr and BP")
-        ec = call(["python3",
-            sort_GWASSS_by_ChrBP,
+        sort_GWASSS_by_ChrBP(
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
-            ])
-        if ec == 0:
-            print(f"Sorted by Chr and BP")
-        else:
-            print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
+        )
+        print(f"Sorted by Chr and BP")
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
     if not any(issues.values()):
         print(f"The input summary statistics file has not been identified to have any issues!")
         print(f"all {total_entries} SNPs are good")
-        exit(0)
-
-    if required_sorting and ec != 0:
-        exit(13)
-
+        return
 
 
     ##### 4 #####
@@ -228,24 +183,18 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
     FILE_FOR_FIXING = INPUT_GWAS_FILE_standard_sorted if required_sorting else INPUT_GWAS_FILE_standard
     REHAB_OUTPUT_FILE = OUTPUT_FILE + '.rehabed.tsv'
-    ec = call(["python3",
-            loop_fix,
-            FILE_FOR_FIXING,
-            input_validation_report_dir,
-            REHAB_OUTPUT_FILE,
-            dbSNP_FILE,
-            dbSNP2_FILE,
-            'None',
-            FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-            sorted_by if sorted_by else ''
-            ])
-    print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
+    loop_fix(
+        FILE_FOR_FIXING,
+        input_validation_report_dir,
+        REHAB_OUTPUT_FILE,
+        dbSNP_FILE,
+        dbSNP2_FILE,
+        'None',
+        FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
+        sorted_by if sorted_by else None
+    )
 
-    if ec != 0:
-        print(f"ERROR: loop_fix script finished with exit code: {ec}")
-        exit(14)
-    else:
-        print(f"see fixed file at: \"{REHAB_OUTPUT_FILE}\"")
+    print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
 
@@ -255,17 +204,12 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     REHABed_validation_report_dir = INPUT_GWAS_FILE + "_REHABed-report"
-    ec = call(["python3",
-            validate_GWASSS_entries,
-            REHAB_OUTPUT_FILE,
-            "standard",
-            REHABed_validation_report_dir,
-            ])
+    validate_GWASSS_entries(
+        REHAB_OUTPUT_FILE,
+        "standard",
+        REHABed_validation_report_dir,   
+    )
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-        exit(15)
 
 
 
@@ -296,29 +240,26 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
             if issues_REHABed[col]:
                 print(f"{issues_REHABed[col]}/{total_entries} entries are missing {col}")
         print(f"Going to sort the GWAS SS file by Chr and BP")
-        ec = call(["python3",
-            sort_GWASSS_by_ChrBP,
+        sort_GWASSS_by_ChrBP(
             REHAB_OUTPUT_FILE,
             INPUT_GWAS_FILE_standard_sorted2,
-            ])
-        if ec == 0:
-            print(f"Sorted by Chr and BP")
-        else:
-            print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
+        )
+        print(f"Sorted by Chr and BP")
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
     if not any(issues_REHABed.values()):
-        print(f"The REHABed summary statistics file has not been identified to have any issues!")
-        print(f"all {total_entries} SNPs are good")
-        exit(0)
+        print(f"All issues with all data points have been resolved!")
+        print(f"all {total_entries} SNP entries are good")
+        print(f"see fixed file at: \"{REHAB_OUTPUT_FILE}\"")
+        return
 
-    if required_sorting2 and ec != 0:
-        exit(16)
     if not required_sorting2:
         # if the file doesn't require any other sorting,
         # then with the current sorting everything that could be restored is already restored
-        exit(0)
+        print(f"Those issues which were possible to resolve have been resolved")
+        print(f"see fixed file at: \"{REHAB_OUTPUT_FILE}\"")
+        return
 
 
 
@@ -329,24 +270,17 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
 
     FILE_FOR_FIXING = INPUT_GWAS_FILE_standard_sorted2 if required_sorting2 else REHAB_OUTPUT_FILE
     REHAB2_OUTPUT_FILE = OUTPUT_FILE + '.rehabed-twice.tsv'
-    ec = call(["python3",
-            loop_fix,
-            FILE_FOR_FIXING,
-            REHABed_validation_report_dir,
-            REHAB2_OUTPUT_FILE,
-            dbSNP_FILE,
-            dbSNP2_FILE,
-            'None', # setting to None suppresses liftover second time
-            FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-            sorted_by if sorted_by else ''
-            ])
+    loop_fix(
+        FILE_FOR_FIXING,
+        REHABed_validation_report_dir,
+        REHAB2_OUTPUT_FILE,
+        dbSNP_FILE,
+        dbSNP2_FILE,
+        'None',  # setting to None suppresses liftover second time
+        FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
+        sorted_by if sorted_by else None
+    )
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: loop_fix script finished with exit code: {ec}")
-        exit(17)
-    else:
-        print(f"see fixed file at: \"{REHAB2_OUTPUT_FILE}\"")
 
 
 
@@ -356,17 +290,12 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     start_time = time.time()
 
     REHABed_twice_validation_report_dir = INPUT_GWAS_FILE + "_REHABed-twice-report"
-    ec = call(["python3",
-            validate_GWASSS_entries,
-            REHAB2_OUTPUT_FILE,
-            "standard",
-            REHABed_twice_validation_report_dir,
-            ])
+    validate_GWASSS_entries(
+        REHAB2_OUTPUT_FILE,
+        "standard",
+        REHABed_twice_validation_report_dir,
+    )
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-        exit(18)
 
 
 
@@ -390,10 +319,11 @@ def fix(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, dbSNP_FILE: str, dbSNP2_FILE: st
     if not any(issues.values()):
         print(f"The twice REHABed summary statistics file has not been identified to have any issues!")
         print(f"all {total_entries} SNPs are good")
-        exit(0)
-
-    if required_sorting and ec != 0:
-        exit(19)
+        print(f"see fixed file at: \"{REHAB2_OUTPUT_FILE}\"")
+        return
+    else:
+        print(f"Those issues which were possible to resolve have been resolved")
+        print(f"see fixed file at: \"{REHAB2_OUTPUT_FILE}\"")
 
 
 
@@ -413,17 +343,12 @@ def diagnose(INPUT_GWAS_FILE: str, REPORT_DIR: str):
     print(f'=== Diagnosis ===')
     start_time = time.time()
 
-    ec = call(["python3",
-            validate_GWASSS_entries,
-            INPUT_GWAS_FILE,
-            JSON_CONFIG,
-            REPORT_DIR if REPORT_DIR and REPORT_DIR != 'None' else '',
-            ])
+    validate_GWASSS_entries(
+        INPUT_GWAS_FILE,
+        JSON_CONFIG,
+        REPORT_DIR if REPORT_DIR and REPORT_DIR != 'None' else None,
+    )
     print(f"  Diagnosis finished in {(time.time() - start_time)} seconds\n")
-
-    if ec != 0:
-        print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-        exit(11)
 
     return None
 
@@ -443,16 +368,12 @@ def sort(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, SORT_BY: str):
         start_time = time.time()
 
         FILE_TO_SORT = OUTPUT_FILE + ".unsorted.tsv"
-        ec = call(["python3",
-                prepare_GWASSS_columns,
-                INPUT_GWAS_FILE,
-                FILE_TO_SORT,
-                ])
+        prepare_GWASSS_columns(
+            INPUT_GWAS_FILE,
+            FILE_TO_SORT,
+        )
         print(f"  Formatting finished in {(time.time() - start_time)} seconds\n")
 
-        if ec != 0:
-            print(f"ERROR: prepare_GWASSS_columns script finished with exit code: {ec}")
-            exit(11)
     else:
         print("there's no corresponding .json file, so STANDARD_COLUMN_ORDER is assumed")
 
@@ -462,21 +383,15 @@ def sort(INPUT_GWAS_FILE: str, OUTPUT_FILE: str, SORT_BY: str):
     start_time = time.time()
 
     if SORT_BY == 'rsID':
-        ec = call(["python3",
-            sort_GWASSS_by_rsID,
+        sort_GWASSS_by_rsID(
             FILE_TO_SORT,
             OUTPUT_FILE,
-            ])
-        if ec != 0:
-            print(f"ERROR: sort_GWASSS_by_rsID script finished with exit code: {ec}")
+        )
     elif SORT_BY == 'ChrBP':
-        ec = call(["python3",
-            sort_GWASSS_by_ChrBP,
+        sort_GWASSS_by_ChrBP(
             FILE_TO_SORT,
             OUTPUT_FILE,
-            ])
-        if ec != 0:
-            print(f"ERROR: sort_GWASSS_by_ChrBP script finished with exit code: {ec}")
+        )
 
     print(f"  Sorting finished in {(time.time() - start_time)} seconds\n")
 
@@ -493,18 +408,13 @@ def prepare_dbSNPs(SNPs_FILE: str, OUTPUT_FILE: str, gzsort: str, bcftools: str,
     buffer_size = str(buffer_size)
 
     ### RUN ###
-    ec = call(["python3",
-            prepare_two_dbSNPs,
-            SNPs_FILE,
-            gzsort,
-            bcftools,
-            buffer_size,
-            OUTPUT_FILE,
-            ])
-
-    if ec != 0:
-        print(f"ERROR: validate_GWASSS_entries script finished with exit code: {ec}")
-        exit(11)
+    prepare_two_dbSNPs(
+        SNPs_FILE,
+        gzsort,
+        bcftools,
+        buffer_size,
+        OUTPUT_FILE,
+    )
 
     return None
 

@@ -4,7 +4,7 @@ import os
 import time
 
 # local
-from utils import run_bash
+from lib.utils import run_bash
 
 
 
@@ -14,7 +14,7 @@ def remove_last_ext(filename: str):
 
 def prepare_two_dbSNPs(SNPs_FILE: str, gzsort: str, bcftools: str, buffer_size: str, OUTPUT_FILE: str):
     """
-    Takes a dbSNP dataset and turns it into two datasets for later use in FIX command.
+    Takes a dbSNP dataset and turns it into two datasets for later use in the FIX command.
 
     Parameters
     ----------
@@ -35,9 +35,7 @@ def prepare_two_dbSNPs(SNPs_FILE: str, gzsort: str, bcftools: str, buffer_size: 
     """
 
     if not os.path.isfile(SNPs_FILE):
-        print(f"ERROR: provided SNPs file doesn't exist: {SNPs_FILE}")
-        exit(1)
-
+        raise ValueError(f"passed provided SNPs file doesn't exist at path: {SNPs_FILE}")
 
     buffer_size = buffer_size.strip().replace(' ', '')
     SNPs_FILE_DATA = OUTPUT_FILE + ".1.tsv.gz"
