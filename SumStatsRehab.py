@@ -4,7 +4,7 @@ import os
 from subprocess import call
 import inspect
 import time
-from typing import Dict, Literal, Union
+from typing import Dict, List, Literal, Union
 import json
 import argparse
 import pathlib
@@ -15,10 +15,11 @@ from lib.prepare_GWASSS_columns import prepare_GWASSS_columns
 from lib.validate_GWASSS_entries import validate_GWASSS_entries
 from lib.sort_GWASSS_by_ChrBP import sort_GWASSS_by_ChrBP
 from lib.sort_GWASSS_by_rsID import sort_GWASSS_by_rsID
-from lib.loop_fix import loop_fix, ActivatedResolvers
+from lib.loop_fix import ResolverName, resolvers_names, loop_fix, ActivatedResolvers
 from lib.report_utils import read_report_from_dir
 from lib.standard_column_order import STANDARD_COLUMN_ORDER
 from lib.env import get_build, set_build
+from lib.utils import mv, rm, rm_r, rm_rf
 
 
 
@@ -42,23 +43,26 @@ def perc(x, total):
 
 
 class brag:
-    def all_issues_resolved(self, OUTPUT_FILE: str, total_entries: int):
+    def see_formatted_file(self, OUTPUT_FILE: str):
+        print(f" see formatted file at: \"{OUTPUT_FILE}\"")
+
+    def see_fixed_file(self, OUTPUT_FILE: str):
+        print(f" see fixed file at: \"{OUTPUT_FILE}\"")
+
+
+    def all_issues_resolved(self, total_entries: int):
         print(f"All issues with all data points have been resolved!")
         print(f"all {total_entries} SNP entries are good")
-        print(f" see fixed file at: \"{OUTPUT_FILE}\"")
 
-    def all_which_can_be_solved_is_resolved(self, OUTPUT_FILE: str):
+    def all_which_can_be_solved_is_resolved(self):
         print(f"Those issues which were possible to resolve have been resolved")
-        print(f" see fixed file at: \"{OUTPUT_FILE}\"")
 
-    def the_input_file_has_no_issues(self, OUTPUT_FILE: str, total_entries: int):
+    def the_input_file_has_no_issues(self, total_entries: int):
         print(f"The input summary statistics file doesn't seem to have any issues!")
         print(f"all {total_entries} SNPs are good")
-        print(f" see formatted file at: \"{OUTPUT_FILE}\"")
 
-    def the_input_file_has_nothing_to_resolve(self, OUTPUT_FILE: str):
-        print(f"The input file has nothing else to resolve")
-        print(f" see formatted file at: \"{OUTPUT_FILE}\"")
+    def the_input_file_has_nothing_to_resolve(self):
+        print(f"The input file has nothing to resolve")
 
 BRAG = brag()
 
@@ -69,8 +73,19 @@ class inform:
         if BP_lost > 0:
             print(f"lost {BP_lost}  ({perc(BP_lost, total_entries)}) \"BP\" fields")
 
+    def no_need_for_liftover_since_ChrBP_will_be_restored(self):
+        print(f"There's no need for liftover since all Chr and BP will be attempted to be restored in the target build")
+
 INFORM = inform()
         
+class warn:
+    def impossible_to_liftover_since_all_Chr_or_BP_are_invalid(self):
+        print(f"WARNING: Impossible to perform liftover. Liftover requires at least 1 entry with both valid Chr and BP. dbSNP2 wasn't passed, so Chr and BP will not be restored.")
+
+    def beta_resolver_was_enabled(self):
+        print(f"WARNING: if standard error field is provided without a sign, then restored beta will be unsigned.")
+
+WARN = warn()
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -87,7 +102,7 @@ def fix(INPUT_GWAS_FILE: str,
         dbSNP2_FILE: str,
         CHAIN_FILE: str,
         FREQ_DATABASE_SLUG: str,
-        ACTIVATED_RESOLVERS: Dict[str, bool] = {
+        ACTIVATED_RESOLVERS: Dict[ResolverName, bool] = {
             "ChrBP": True,
             "rsID":  True,
             "OA":    True,
@@ -97,6 +112,7 @@ def fix(INPUT_GWAS_FILE: str,
             "SE":    True,
             "pval":  True,
         },
+        VERBOSE: bool = False,
     ):
 
     ### PROCESS INPUT ###
@@ -111,20 +127,32 @@ def fix(INPUT_GWAS_FILE: str,
 
 
     ### declare shortcut functions ###
-    issues: Dict[str, int]
-    
-    def gonna_resolve(field: str):
+    def gonna_resolve(field: str, issues: Dict[str, int]) -> bool:
         if field in ('Chr', 'BP'):
-            return issues[field] and ACTIVATED_RESOLVERS['ChrBP'] # Chr and BP are always resolved together
+            return bool(issues[field] and dbSNP2_FILE != 'None' and ACTIVATED_RESOLVERS['ChrBP']) # Chr and BP are always resolved together
+        elif field == 'rsID':
+            return bool(issues[field] and dbSNP_FILE  != 'None' and ACTIVATED_RESOLVERS['rsID'])
+        elif field in ('OA','EA','EAF'):
+            return bool(issues[field] and (dbSNP_FILE != 'None' or dbSNP2_FILE != 'None') and ACTIVATED_RESOLVERS[field])
         else:
-            return issues[field] and ACTIVATED_RESOLVERS[field]
+            return bool(issues[field] and ACTIVATED_RESOLVERS[field])
     
     def any_issues_to_resolve(issues: Dict[str, int]):
         issues_to_resolve: Dict[str, int] = {}
-        for issue, issue_count in issues.items():
-            if issue_count > 0 and gonna_resolve(issue):
-                issues_to_resolve[issue] = True
+        for field, issue_count in issues.items():
+            if issue_count > 0 and gonna_resolve(field, issues):
+                issues_to_resolve[field] = True
         return any(issues_to_resolve.values())
+
+    intermediate_files: List[str] = []
+    def present_output(result_file: str):
+        if VERBOSE:
+            return result_file
+        else:
+            for junk in intermediate_files:
+                rm_rf(junk)
+            mv(result_file, OUTPUT_FILE)
+            return OUTPUT_FILE
 
 
 
@@ -165,6 +193,7 @@ def fix(INPUT_GWAS_FILE: str,
         "standard",
         input_validation_report_dir,   
     )
+    intermediate_files.append(input_validation_report_dir)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
@@ -184,37 +213,45 @@ def fix(INPUT_GWAS_FILE: str,
     INPUT_GWAS_FILE_prepared: str = INPUT_GWAS_FILE_standard
 
 
-    if get_build() != 'hg38' and \
-        CHAIN_FILE and \
-        CHAIN_FILE != "None" and \
-        issues['BP']<total_entries and \
-        issues['Chr']<total_entries:
-        # if either BP or Chr is fully missing,
-        # there's no need for liftover since those will be restored with dbSNPs in the target build
-        required_liftover = True
-        ChrBP_lost_because_of_liftover = loop_fix(
-            INPUT_GWAS_FILE_standard,
-            input_validation_report_dir,
-            INPUT_GWAS_FILE_standard_lifted,
-            dbSNP_FILE,
-            dbSNP2_FILE,
-            CHAIN_FILE,
-            FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-            sorted_by if sorted_by else None,
-        )
-        INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_lifted
+    if get_build() != 'hg38' and CHAIN_FILE and CHAIN_FILE != "None":
+        if issues['BP']<total_entries and issues['Chr']<total_entries:
+            required_liftover = True
+            ChrBP_lost_because_of_liftover = loop_fix(
+                INPUT_GWAS_FILE_standard,
+                input_validation_report_dir,
+                INPUT_GWAS_FILE_standard_lifted,
+                dbSNP_FILE,
+                dbSNP2_FILE,
+                CHAIN_FILE,
+                FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
+                sorted_by if sorted_by else None,
+            )
+            INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_lifted
+            intermediate_files.append(INPUT_GWAS_FILE_standard)
 
-        print("finished liftover to hg38 (saved report)")
-        set_build('hg38')
+            print("finished liftover to hg38 (saved report)")
+            set_build('hg38')
 
-        input_lifted_validation_report_dir = INPUT_GWAS_FILE + "_input-lifted-report"
-        validate_GWASSS_entries(
-            INPUT_GWAS_FILE_standard_lifted,
-            "standard",
-            input_lifted_validation_report_dir,
-        )
+            input_lifted_validation_report_dir = INPUT_GWAS_FILE + "_input-lifted-report"
+            validate_GWASSS_entries(
+                INPUT_GWAS_FILE_standard_lifted,
+                "standard",
+                input_lifted_validation_report_dir,
+            )
+            intermediate_files.append(input_lifted_validation_report_dir)
+        elif dbSNP2_FILE != 'None':
+            # if either Chr or BP is fully missing, there's no need for liftover.
+            # Because Chr and BP will be attempted to be restored with dbSNPs in the target build
+            set_build('hg38')
+            INFORM.no_need_for_liftover_since_ChrBP_will_be_restored()
+        else:
+            WARN.impossible_to_liftover_since_all_Chr_or_BP_are_invalid()
     
-    if (gonna_resolve('BP') or gonna_resolve('Chr')) and issues['rsID']<total_entries:
+    if (
+            gonna_resolve('BP',issues) or 
+            gonna_resolve('Chr',issues) or 
+            gonna_resolve('EAF',issues)
+        ) and issues['rsID']<total_entries:
         # here if some alleles are invalid, they will be attempted to be restored by rsID,
         # which is better then by ChrBP
         required_sorting = True
@@ -227,11 +264,18 @@ def fix(INPUT_GWAS_FILE: str,
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
         )
+        intermediate_files.append(INPUT_GWAS_FILE_standard_lifted)
+        intermediate_files.append(INPUT_GWAS_FILE_standard)
+        
         INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_sorted
         print(f"Sorted by rsID")
 
-    elif (gonna_resolve('rsID') or gonna_resolve('OA') or gonna_resolve('EA')) and \
-        issues['Chr']<total_entries and issues['BP']<total_entries:
+    elif (
+            gonna_resolve('rsID',issues) or 
+            gonna_resolve('OA',issues) or 
+            gonna_resolve('EA',issues) or 
+            gonna_resolve('EAF',issues)
+        ) and issues['Chr']<total_entries and issues['BP']<total_entries:
         # however if anyway going to restore any alleles and either:
         #  - all rsIDs are missing, or 
         #  - if going to restore rsID too
@@ -246,6 +290,8 @@ def fix(INPUT_GWAS_FILE: str,
             INPUT_GWAS_FILE_standard_lifted if required_liftover else INPUT_GWAS_FILE_standard,
             INPUT_GWAS_FILE_standard_sorted,
         )
+        intermediate_files.append(INPUT_GWAS_FILE_standard_lifted)
+        intermediate_files.append(INPUT_GWAS_FILE_standard)
         INPUT_GWAS_FILE_prepared = INPUT_GWAS_FILE_standard_sorted
         print(f"Sorted by Chr and BP")
 
@@ -253,9 +299,9 @@ def fix(INPUT_GWAS_FILE: str,
 
 
     if not any(issues.values()) and not ChrBP_lost_because_of_liftover:
-        BRAG.the_input_file_has_no_issues(
-            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
-            total_entries = total_entries,
+        BRAG.the_input_file_has_no_issues(total_entries)
+        BRAG.see_formatted_file(
+            present_output(INPUT_GWAS_FILE_prepared)
         )
         return
     elif not any(issues.values()) and ChrBP_lost_because_of_liftover:
@@ -264,13 +310,15 @@ def fix(INPUT_GWAS_FILE: str,
              BP_lost=ChrBP_lost_because_of_liftover,
             total_entries=total_entries,
         )
-        BRAG.the_input_file_has_nothing_to_resolve(
-            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
+        BRAG.the_input_file_has_nothing_to_resolve()
+        BRAG.see_formatted_file(
+            present_output(INPUT_GWAS_FILE_prepared)
         )
         return
     elif not any_issues_to_resolve(issues):
-        BRAG.the_input_file_has_nothing_to_resolve(
-            OUTPUT_FILE = INPUT_GWAS_FILE_prepared,
+        BRAG.the_input_file_has_nothing_to_resolve()
+        BRAG.see_formatted_file(
+            present_output(INPUT_GWAS_FILE_prepared)
         )
         return
 
@@ -293,7 +341,7 @@ def fix(INPUT_GWAS_FILE: str,
         FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
         sorted_by if sorted_by else None
     )
-
+    intermediate_files.append(FILE_FOR_FIXING)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
@@ -309,6 +357,7 @@ def fix(INPUT_GWAS_FILE: str,
         "standard",
         REHABed_validation_report_dir,   
     )
+    intermediate_files.append(REHABed_validation_report_dir)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
@@ -333,9 +382,14 @@ def fix(INPUT_GWAS_FILE: str,
     INPUT_GWAS_FILE_standard_sorted2 = remove_last_ext(INPUT_GWAS_FILE) + "_standard_sorted2.tsv"
 
     required_sorting2: bool = False
-    if sorted_by != 'ChrBP' and (issues_REHABed['rsID'] or issues_REHABed['OA'] or issues_REHABed['EA']) and \
+    if sorted_by != 'ChrBP' and (
+            gonna_resolve('rsID',issues_REHABed) or
+            gonna_resolve('OA',issues_REHABed) or
+            gonna_resolve('EA',issues_REHABed) or
+            gonna_resolve('EAF',issues_REHABed)
+        ) and \
         (not issues['Chr']==total_entries and not issues['BP']==total_entries):
-        # if either rsID, OA, or EA are missing, we can try sorting by ChrBP to restore them.
+        # if either rsID, OA, or EA are invalid, we can try sorting by ChrBP to restore them.
         # But if Chr or BP was totally missing at first, it won't help to try this
 
         required_sorting2 = True
@@ -348,22 +402,25 @@ def fix(INPUT_GWAS_FILE: str,
             REHAB_OUTPUT_FILE,
             INPUT_GWAS_FILE_standard_sorted2,
         )
+        intermediate_files.append(REHAB_OUTPUT_FILE)
+
         print(f"Sorted by Chr and BP")
 
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
     if not any(issues_REHABed.values()):
-        BRAG.all_issues_resolved(
-            OUTPUT_FILE = REHAB_OUTPUT_FILE,
-            total_entries = total_entries,
+        BRAG.all_issues_resolved(total_entries)
+        BRAG.see_fixed_file(
+            present_output(REHAB_OUTPUT_FILE)
         )
         return
 
     if not required_sorting2:
         # if the file doesn't require any other sorting,
         # then with the current sorting everything that could be restored is already restored
-        BRAG.all_which_can_be_solved_is_resolved(
-            OUTPUT_FILE = REHAB_OUTPUT_FILE,
+        BRAG.all_which_can_be_solved_is_resolved()
+        BRAG.see_fixed_file(
+            present_output(REHAB_OUTPUT_FILE)
         )
         return
 
@@ -386,6 +443,7 @@ def fix(INPUT_GWAS_FILE: str,
         FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
         sorted_by if sorted_by else None
     )
+    intermediate_files.append(FILE_FOR_FIXING)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
@@ -401,6 +459,7 @@ def fix(INPUT_GWAS_FILE: str,
         "standard",
         REHABed_twice_validation_report_dir,
     )
+    intermediate_files.append(REHABed_twice_validation_report_dir)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
 
@@ -423,14 +482,15 @@ def fix(INPUT_GWAS_FILE: str,
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
 
     if not any(issues_REHABed_twice.values()):
-        BRAG.all_issues_resolved(
-            OUTPUT_FILE = REHAB2_OUTPUT_FILE,
-            total_entries = total_entries,
+        BRAG.all_issues_resolved(total_entries)
+        BRAG.see_fixed_file(
+            present_output(REHAB2_OUTPUT_FILE)
         )
         return
     else:
-        BRAG.all_which_can_be_solved_is_resolved(
-            OUTPUT_FILE = REHAB2_OUTPUT_FILE,
+        BRAG.all_which_can_be_solved_is_resolved()
+        BRAG.see_fixed_file(
+            present_output(REHAB2_OUTPUT_FILE)
         )
         return
 
@@ -584,15 +644,24 @@ def main():
     FIX_PARSER.add_argument('--INPUT', dest='INPUT_GWAS_FILE', type=GWASSS_path_type, required=True,
         help='Path to GWAS summary stats in tab-separated format (.tsv, .tsv.gz, .tsv.zip), with a config file at the same path with .json suffix')
     FIX_PARSER.add_argument('--OUTPUT', dest='OUTPUT_FILE', type=pathlib.Path, required=True,
-        help='Output path. This name will be used as a base for output file(s)')
+        help='Output path for the final fixed file.\nIf --verbose key is set, then this name will be used as a base (prefix) for output file(s)')
     FIX_PARSER.add_argument('--dbsnp-1', dest='dbSNP1_FILE', type=maybe_file_path_type, required=False, default='None',
         help='Path to prepared dbSNP file #1 for the target build')
     FIX_PARSER.add_argument('--dbsnp-2', dest='dbSNP2_FILE', type=maybe_file_path_type, required=False, default='None',
         help='Path to prepared dbSNP file #2 for the target build')
     FIX_PARSER.add_argument('--chain-file', dest='CHAIN_FILE', type=maybe_file_path_type, required=False, default='None',
-        help='Path to the chain file for liftover from given build to GrCh38')
+        help='Path to the chain file for liftover from the given build to GrCh38')
     FIX_PARSER.add_argument('--freq-db', dest='FREQ_DATABASE_SLUG', type=str, required=False, default='dbGaP_PopFreq',
         help='Population slug from frequency database in dbSNP (e.g.: "GnomAD", "dbGaP_PopFreq", "TOMMO", "1000Genomes", etc.). Default: "dbGaP_PopFreq"')
+    FIX_PARSER.add_argument('--restore', choices=resolvers_names, nargs='+',
+        help=f'Enable resotration of particular fields', required=False)
+    FIX_PARSER.add_argument('--do-not-restore', choices=resolvers_names, nargs='+',
+        help=f'Disable resotration of particular fields. By default, everything is enabled except "beta". This key takes priority over --restore', required=False)
+    FIX_PARSER.add_argument('--verbose', dest='VERBOSE', action='store_true',
+        help=f"If set, preserves all intermediate files and their diagnoses on all stages of fixing.\n" +
+        "The --OUTPUT key path will be used as a base name for the resulting files, and will not be the exact path to a file\n" + 
+        "This key doesn't affect logging."
+        , required=False)
 
 
     DIAGNOSE_PARSER.add_argument('--INPUT', dest='INPUT_GWAS_FILE', type=file_path_type, required=True,
@@ -626,9 +695,28 @@ def main():
     print(f"{p.prog} {version} {args.command}")
 
     if args.command == 'fix':
-        # print("WARNING: if standard error field is provided without a sign, then restored beta will be unsigned.")
+        chosen_resolvers: Dict[ResolverName, bool] = {
+            "ChrBP": True,
+            "rsID":  True,
+            "OA":    True,
+            "EA":    True,
+            "EAF":   True,
+            "beta":  False,
+            "SE":    True,
+            "pval":  True,
+        }
+        if args.restore:
+            for field in args.restore:
+                chosen_resolvers[field] = True
+        if args.do_not_restore:
+            for field in args.do_not_restore:
+                chosen_resolvers[field] = False
+        if chosen_resolvers['beta']:
+            WARN.beta_resolver_was_enabled()
+
         fix(args.INPUT_GWAS_FILE, args.OUTPUT_FILE,
-            args.dbSNP1_FILE, args.dbSNP2_FILE, args.CHAIN_FILE, args.FREQ_DATABASE_SLUG)
+            args.dbSNP1_FILE, args.dbSNP2_FILE, args.CHAIN_FILE, args.FREQ_DATABASE_SLUG,
+            chosen_resolvers, args.VERBOSE)
 
     elif args.command == 'diagnose':
         diagnose(args.INPUT_GWAS_FILE, args.REPORT_DIR)

@@ -155,6 +155,7 @@ SumStatsRehab fix --INPUT INPUT_GWAS_FILE --OUTPUT OUTPUT_FILE
                        [--dbsnp-1 DBSNP1_FILE] [--dbsnp-2 DBSNP2_FILE]
                        [--chain-file CHAIN_FILE]
                        [--freq-db FREQ_DATABASE_SLUG]
+                       [{--restore,--do-not-restore} {ChrBP,rsID,OA,EA,EAF,beta,SE,pval}+]
 ```
 where:
  - `INPUT_GWAS_FILE` is the input GWAS SS file with the corresponding `.json` config file create at step 4
@@ -167,7 +168,7 @@ where:
 example:
 
 ```bash
-SumStatsRehab fix --INPUT "29559693.tsv" --OUTPUT "SumStatsRehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED
+SumStatsRehab fix --INPUT "29559693.tsv" --OUTPUT "SumStatsRehab_fixed/29559693" --dbsnp-1 "dbSNP_155_b38.1.tsv.gz" --dbsnp-2 "dbSNP_155_b38.2.tsv.gz" --chain-file "hg19_to_hg38.chain" --freq-db TOPMED --do-not-restore OA EA
 ```
 
 As the normal process of `fix`, a report will be generated for the input file, as well as for the file after each step of processing. Depending on the availability of invalid/missing data in the GWAS SS file and the input arguments, a different number of steps may be required for a complete run of the `fix` command, with 1 or 2 _loops_ performed on the GWAS SS file. All steps are performed automatically without prompt. The process of `fix`ing is represented in logging to the standard output and may take anywhere from 5 minutes to 1.5 hours, depending on the size of the file and the number of steps.
@@ -218,7 +219,6 @@ When `fix`ing, file is first formatted into this internal format. Output file is
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
- - **add a WARNING that beta will be restored with an accurate sign only when the standard error is signed.**
  - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to test SumStatsRehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
  - **make SumStatsRehab installable via `pip`**
  - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.

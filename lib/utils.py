@@ -1,6 +1,8 @@
 # standard library
 from subprocess import run, PIPE
 from typing import List
+import os
+import shutil
 
 
 
@@ -26,3 +28,26 @@ def run_cmd(cmd: List[str]):
 def run_bash(bash_code: str):
     """Safely runs a given bash code, and nicely fails on a non-zero exit code"""
     return run_cmd(['bash', '-c', bash_code])
+
+def rm(file: str):
+    try:
+        return os.remove(file)
+    except FileNotFoundError:
+        return None
+
+def rm_r(dir: str):
+    try:
+        return shutil.rmtree(dir)
+    except FileNotFoundError:
+        return None
+
+def rm_rf(file_or_dir: str):
+    if os.path.isdir(file_or_dir):  
+        return rm_r(file_or_dir)
+    elif os.path.isfile(file_or_dir):  
+        return rm(file_or_dir)
+    else:
+        return None
+
+def mv(file_or_dir: str, new_name: str):
+    shutil.move(file_or_dir, new_name)

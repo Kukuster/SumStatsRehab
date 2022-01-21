@@ -34,6 +34,10 @@ class kukdefaultdict(dict):
         return key
 
 
+ResolverName = Literal["ChrBP","rsID","OA","EA","EAF","beta","SE","pval"]
+resolvers_names =     ["ChrBP","rsID","OA","EA","EAF","beta","SE","pval"]
+
+
 def loop_fix(
     GWAS_FILE: str,
     REPORT_DIR: str,
@@ -43,7 +47,7 @@ def loop_fix(
     CHAIN_FILE: Union[None, str],
     FREQ_DATABASE_SLUG: Union[None, str],
     GWAS_SORTING: Literal[None, 'rsID', 'ChrBP'] = None,
-    ACTIVATED_RESOLVERS: Dict[str, bool] = {
+    ACTIVATED_RESOLVERS: Dict[ResolverName, bool] = {
         "ChrBP": True,
         "rsID":  True,
         "OA":    True,
