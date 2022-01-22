@@ -26,7 +26,7 @@ Topic :: Scientific/Engineering :: Bio-Informatics
 if __name__ == "__main__":
     setup(
         name="SumStatsRehab",
-        version="1.1.0",
+        version="1.1.1",
         description="GWAS summary statistics files QC tool",
         url="https://github.com/Kukuster/SumStatsRehab",
         license="MIT",

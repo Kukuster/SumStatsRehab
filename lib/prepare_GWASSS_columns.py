@@ -125,7 +125,7 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
                 awk -F$'\t' '
                     # see answer https://unix.stackexchange.com/a/363471/387925
                     # on question https://unix.stackexchange.com/questions/281271/can-i-determine-type-of-an-awk-variable
-                    function typeof(obj,   q, x, z){{
+                    function o_class(obj,   q, x, z){{
                         q = CONVFMT
                         CONVFMT = "% g"
                             split(" " obj "\1" obj, x, "\1")
@@ -150,7 +150,8 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
                     {{
                         rowsum=0
                         for(i=1;i<=NF;i++){{
-                            if (typeof($i) == "number" || typeof($i) == "strnum"){{
+                            datum_type = o_class($i)
+                            if (datum_type == "number" || datum_type == "strnum"){{
                                 rowsum += $i * weights[i]
                             }} else {{
                                 print "."
