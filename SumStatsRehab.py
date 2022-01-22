@@ -692,7 +692,10 @@ def main():
 
     args = p.parse_args()
 
-    print(f"{p.prog} {version} {args.command}")
+    if args.command:
+        print(f"{p.prog} v{version} - {args.command} command")
+    else:
+        print(f"{p.prog} v{version}")
 
     if args.command == 'fix':
         chosen_resolvers: Dict[ResolverName, bool] = {
