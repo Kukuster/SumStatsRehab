@@ -42,6 +42,21 @@ To use the `fix` command to its fullest, a user needs:
  - chain file, if the GWAS SS file is provided in build different from the target build 
 
 
+## Deprecated installation method (since March 15, 2022):
+```
+pip install git+https://github.com/Kukuster/SumStatsRehab.git
+```
+or, for specific version:
+```
+pip install git+https://github.com/Kukuster/SumStatsRehab.git@v1.1.1 --upgrade
+```
+
+This installation method doesn't work with the currently upcoming git protocol security update on github:
+ - https://github.blog/2021-09-01-improving-git-protocol-security-github/
+
+
+
+
 ## Tutorial
 ### 1. Download dbSNP dataset
 Download dbSNP datasets from NCBI, in the target build, in vcf, vcf.gz, bcf, or bcf.gz format. The latest versions are recommended.
