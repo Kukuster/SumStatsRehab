@@ -1,5 +1,19 @@
 # SumStatsRehab
 
+SumStatsRehab is a universal GWAS SumStats [pre-processing](https://en.wikipedia.org/wiki/Data_preparation) tool. SumStatsRehab takes care of each of the original data points to maximize statistical power of downstream calculations. Currently, the only supported processing which may result in a loss of the original data is liftover, which is a common task, and is optional to the user.
+
+Examples of what the tool does:
+ - data validation (e.g. `diagnose` command),
+ - data enrichment (e.g. restoration of a missing Chr and BP fields from rsID in the input GWAS SumStats file by rsID lookup in the input dbSNP dataset),
+ - data correction (restoration of invariably erroneous values),
+ - data formatting (e.g. sorting),
+ - data restoration (e.g. calculation of a StdErr field from present p-value and beta fields).
+
+Example of what the tool does not:
+ - data cleaning/reduction
+
+SumStatsRehab aims to be a production-grade software, but you may find it to be not a complete data preparation solution for sumstats-ingesting pipelines. Yet, the tool streamlines the development of the data preparation part. This comes out from focusing on solving more complex problems that span many different use-cases, instead of covering only specific use-cases.
+
 ## dependencies:
  - python 3.8+
  - a GNU/Linux with bash v4 or 5.
@@ -48,7 +62,7 @@ pip install git+https://github.com/Kukuster/SumStatsRehab.git
 ```
 or, for specific version:
 ```
-pip install git+https://github.com/Kukuster/SumStatsRehab.git@v1.1.1 --upgrade
+pip install git+https://github.com/Kukuster/SumStatsRehab.git@v1.1.2 --upgrade
 ```
 
 This installation method doesn't work with the currently upcoming git protocol security update on github:
@@ -280,6 +294,7 @@ Warning: Restored betas with an unknown sign should not be utilized in any downs
 
 
 ## BACKLOG
+ - **add switches to the `fix` command to turn on and off the restoration of the ambiguous effect alleles (in cases when the dbSNPs present multiple options for ALT)**
  - (maybe) improve restoring alleles by adding checks for an exact match of flipped alleles if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory and is relevant only for restoring alleles by looping through the file sorted by Chr and BP.
  - add the ability to specify additional columns from the GWAS SS file that the user wants to include in the end file. This would be an array of integers in the json config file for the input GWAS SS file.
  - **improve code in the main file: `SumStatsRehab.py`**
@@ -289,9 +304,10 @@ Warning: Restored betas with an unknown sign should not be utilized in any downs
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
  - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
- - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to test SumStatsRehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
+ - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to do more tests of SumStatsRehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
  - **make SumStatsRehab installable via `pip`**
  - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.
  - `diagnose` command script should also generate a bar chart for the bin with missing p-value
  - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
  - **add the following logic for restoring MAF: if the DB specifies allele frequency for all alleles except one (dot '.'), then it should calculated as 1 minus frequency of other alleles instead of leaving a dot**
+ - add feature: `amputate` command. Runs `diagnosis` and removes all the invalid rows.

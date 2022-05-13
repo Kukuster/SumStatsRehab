@@ -631,7 +631,7 @@ def maybe_file_path_type(string: str):
 
 
 def main():
-    version = "1.1.1"
+    version = "1.1.2"
 
     p = argparse.ArgumentParser(description='GWAS summary statistics QC tool')
     p.prog = 'SumStatsRehab'
