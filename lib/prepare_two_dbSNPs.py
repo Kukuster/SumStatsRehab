@@ -4,9 +4,10 @@ import os
 import time
 
 # local
-from lib.utils import run_bash
+from lib.utils import run_bash, run_bash_rich
 
-
+class BcftoolsQueryError(Exception):
+    pass
 
 def remove_last_ext(filename: str):
     return filename.rsplit(".", 1)[0] # passed 1 means do max 1 split; _rightmost_ splits first
@@ -19,7 +20,7 @@ def prepare_two_dbSNPs(SNPs_FILE: str, gzsort: str, bcftools: str, buffer_size: 
     Parameters
     ----------
     SNPs_FILE : str
-        path to a SNPs file in vcf, vcf.gz, bcf, bcf.gz format
+        path to a SNPs file in vcf, vcf.gz, bcf, bcf.gz format, with the corresponding .tbi
 
     gzsort : str
         path to the gz-sort executable
@@ -45,13 +46,40 @@ def prepare_two_dbSNPs(SNPs_FILE: str, gzsort: str, bcftools: str, buffer_size: 
 
     #
     # STEP #1
-    #    Get formatted table data from dbSNP
+    #    Get formatted table data from dbSNP, creating dbSNP1
     #
     print("=== Preparing DB1 ===")
     start_time = time.time()
 
+    # 1.1 Check whether 'freq' tags are present in the input dbSNP file
+    """
+    Check whether 'freq' tags are present in the input dbSNP file,
+    and make sure bcftools can query at least all other necessary fields
+    """
+    vcf_tags_query_w_freq  = "%CHROM\t%POS\t%ID\t%REF\t%ALT\tfreq=%FREQ\n"
+    vcf_tags_query_wo_freq = "%CHROM\t%POS\t%ID\t%REF\t%ALT\t.\n"
+    error_msg="error querying tags"
+
+    vcf_tags_query = vcf_tags_query_w_freq
+    check_vcf_tags = f'''(\"{bcftools}\" query -f '{vcf_tags_query}' \"{SNPs_FILE}\" || echo "{error_msg}") | head -n 1'''
+    res = run_bash_rich(check_vcf_tags)
+    if res.stdout == error_msg:
+        print("It seems like FREQ tag is not present in the INFO field, therefore preprocessed dbSNPs will not have allele frequencies")
+        vcf_tags_query = vcf_tags_query_wo_freq
+        check_vcf_tags = f'''(\"{bcftools}\" query -f '{vcf_tags_query}' \"{SNPs_FILE}\" || echo "{error_msg}") | head -n 1'''
+        res = run_bash_rich(check_vcf_tags)
+        if res.stdout == error_msg:
+            user_error_message = f'''bcftools couldn't query the necessary columns ("{vcf_tags_query_wo_freq}") from the given SNPs file\n'''
+            user_error_message+= f'''bcftools exit code: {res.ec}\n'''
+            user_error_message+= f'''bcftools error msg: \n'''
+            user_error_message+= f'''  <<\n'''
+            user_error_message+= f'''{res.stderr}\n'''
+            user_error_message+= f'''          >>\n'''
+            raise BcftoolsQueryError(user_error_message)
+
+    # 1.2 create dbSNP1 by performing field query using bcftools
     get_header = f"echo 'CHROM\tPOS\tID\tREF\tALT\tFREQ'"
-    query_fields = f"\"{bcftools}\" query -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\tfreq=%FREQ\n' \"{SNPs_FILE}\""
+    query_fields = f"\"{bcftools}\" query -f '{vcf_tags_query}' \"{SNPs_FILE}\""
     format_fields = f"""awk -F $'\t' 'BEGIN {{
         # GRCh38.p13, GenBank sequence
         chrs["CM000663.2"] = "1"
@@ -216,7 +244,8 @@ def prepare_two_dbSNPs(SNPs_FILE: str, gzsort: str, bcftools: str, buffer_size: 
 
     #
     # STEP #2
-    #    FINALLY, sort the formatted table data by rsID, and remove the intermediate file
+    #    FINALLY, sort the formatted table data by rsID, creating dbSNP2,
+    #     and remove the intermediate file
     #
     print("=== Preparing DB2 ===")
     start_time = time.time()
