@@ -83,6 +83,27 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
 
     BASH_CMD = ["paste", "-d$'\\t'"]
 
+    awk_function_o_class = f'''
+        # see answer https://unix.stackexchange.com/a/363471/387925
+        # on question https://unix.stackexchange.com/questions/281271/can-i-determine-type-of-an-awk-variable
+        function o_class(obj,   q, x, z){{
+            q = CONVFMT
+            CONVFMT = "% g"
+                split(" " obj "\1" obj, x, "\1")
+                x[1] = obj == x[1]
+                x[2] = obj == x[2]
+                x[3] = obj == 0
+                x[4] = obj "" == +obj
+            CONVFMT = q
+            z["0001"] = z["1101"] = z["1111"] = "number"
+            z["0100"] = z["0101"] = z["0111"] = "string"
+            z["1100"] = z["1110"] = "strnum"
+            z["0110"] = "undefined"
+            return z[x[1] x[2] x[3] x[4]]
+        }}
+    '''
+    # NOTE: '\1' in python will be interpreted into the same character as '\1' in awk, so no need to additioanlly escape it in python
+
     for i in range(len(STANDARD_COLUMN_ORDER)):
         col_name = STANDARD_COLUMN_ORDER[i]
 
@@ -93,12 +114,29 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
 
             # for any relevant column that's present, cut it.
             # if this is a chromosome column, make sure there's no "chr" prefix
+            # if this is a BP column, make sure all numerical values are in integer format (not in float, or sci notation, etc.)
             if col_name == 'Chr':
                 chrom_col_fd = f"<( "
                 chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
                 chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' ; "
                 chrom_col_fd += f" )"
                 BASH_CMD.append(chrom_col_fd)
+            elif col_name == 'BP':
+                bp_col_fd = f"<( "
+                bp_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
+                bp_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | "
+                bp_col_fd += f"""awk -F $'\\t' '
+                {awk_function_o_class}
+                {{
+                    datum_type = o_class(${c_i})
+                    if (datum_type == "number" || datum_type == "strnum"){{
+                        printf("%.0f\\n", ${c_i})
+                    }} else {{
+                        print ${c_i}
+                    }}
+                }}' ; """
+                bp_col_fd += f" )"
+                BASH_CMD.append(bp_col_fd)
             else:
                 BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
 
@@ -123,23 +161,7 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
             avg_col_df += f"""echo {col_name}_rehab ;
             tail -n +2 \"{BARE_GWAS_FILE}\" | cut -d$'\t' -f{col_indices_for_cut} | \\
                 awk -F$'\t' '
-                    # see answer https://unix.stackexchange.com/a/363471/387925
-                    # on question https://unix.stackexchange.com/questions/281271/can-i-determine-type-of-an-awk-variable
-                    function o_class(obj,   q, x, z){{
-                        q = CONVFMT
-                        CONVFMT = "% g"
-                            split(" " obj "\1" obj, x, "\1")
-                            x[1] = obj == x[1]
-                            x[2] = obj == x[2]
-                            x[3] = obj == 0
-                            x[4] = obj "" == +obj
-                        CONVFMT = q
-                        z["0001"] = z["1101"] = z["1111"] = "number"
-                        z["0100"] = z["0101"] = z["0111"] = "string"
-                        z["1100"] = z["1110"] = "strnum"
-                        z["0110"] = "undefined"
-                        return z[x[1] x[2] x[3] x[4]]
-                    }}
+                    {awk_function_o_class}
                     BEGIN{{
                         split("{col_weights_for_awk}", weights, " ")
 
