@@ -339,7 +339,8 @@ def fix(INPUT_GWAS_FILE: str,
         dbSNP2_FILE,
         'None',
         FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-        sorted_by if sorted_by else None
+        sorted_by if sorted_by else None,
+        ACTIVATED_RESOLVERS,
     )
     intermediate_files.append(FILE_FOR_FIXING)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
@@ -441,7 +442,8 @@ def fix(INPUT_GWAS_FILE: str,
         dbSNP2_FILE,
         'None',  # setting to None suppresses liftover second time
         FREQ_DATABASE_SLUG if FREQ_DATABASE_SLUG else 'None',
-        sorted_by if sorted_by else None
+        sorted_by if sorted_by else None,
+        ACTIVATED_RESOLVERS,
     )
     intermediate_files.append(FILE_FOR_FIXING)
     print(f"  Step {i_step} finished in {(time.time() - start_time)} seconds\n")
