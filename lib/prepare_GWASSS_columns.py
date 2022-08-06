@@ -1,6 +1,6 @@
 # standard library
 import sys
-from typing import Dict, Union
+from typing import Dict, List, Union
 from collections import OrderedDict
 import json
 import os
@@ -43,16 +43,29 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
     #    Parse config file
     #
 
+    # usually user specifies an integer for each column: a 0-indexed column index from the table
     cols_i: Dict[str, int] = {}
+
+    # for EAF, a user may specify not a column index (int), but an object,
+    #       where keys are column indices, and values are weights for those 
     input_cols_i_with_avg: Dict[str, Dict[Union[int, str], Union[int, float]]] = {}
     parsed_cols_i_with_avg: Dict[str, Dict[int, float]] = {}
+
+    # another parameter that user may have specified is an array of additional columns to pick
+    #   these columns will not participate in processing, but remain in the output as they are.
+    # This may especially be useful if the SS file undegoes sorting at some stage.
+    input_readonly_cols_i: Dict[str, List[Union[int, str]]] = {}
+    parsed_readonly_cols_i: Dict[str, List[int]] = {}
+
     for key, value in config.items():
         if isinstance(key, str):
             if isinstance(value, int):
                 cols_i[key] = value
             elif key == 'EAF' and isinstance(value, dict):
                 input_cols_i_with_avg[key] = value
-    
+            elif key == 'other' and isinstance(value, list):
+                input_readonly_cols_i[key] = value
+
     # validate json object format and parse numbers at the same time
     for key, value in input_cols_i_with_avg.items():
         try:
@@ -65,6 +78,17 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
             raise ValueError(f"Invalid json configuration for column: {key}."+
             "Weighted average configuration has to be an object mapping column indices (int) to weights (numbers)")
 
+    # validate json array format and parse at the same time
+    for key, value in input_readonly_cols_i.items():
+        try:
+            for col in value:
+                if key not in parsed_readonly_cols_i.keys():
+                    parsed_readonly_cols_i[key] = []
+                parsed_readonly_cols_i[key].append(int(float(col)))
+        except ValueError as e:
+            print(e)
+            raise ValueError(f"Invalid json configuration for column: {key}."+
+            "\"other\" configuration has to be an array of column indices (int)")
 
 
     #
@@ -110,11 +134,12 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
         if col_name in cols_i.keys():
             # user specifies column indices as starting with 0,
             # whereas Unix cut(1) and awk count columns starting with 1
-            c_i = current_col_index = cols_i[col_name] + 1
+            c_i = cols_i[col_name] + 1
 
             # for any relevant column that's present, cut it.
             # if this is a chromosome column, make sure there's no "chr" prefix
             # if this is a BP column, make sure all numerical values are in integer format (not in float, or sci notation, etc.)
+            # if this is an allele column, make all letters uppercase
             if col_name == 'Chr':
                 chrom_col_fd = f"<( "
                 chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
@@ -137,6 +162,12 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
                 }}' ; """
                 bp_col_fd += f" )"
                 BASH_CMD.append(bp_col_fd)
+            elif col_name in ['OA', 'EA']:
+                chrom_col_fd = f"<( "
+                chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
+                chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{print toupper(${c_i})}}' ; "
+                chrom_col_fd += f" )"
+                BASH_CMD.append(chrom_col_fd)
             else:
                 BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
 
@@ -191,6 +222,15 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
             # if user didn't specify index for the column, a template column is added (header only)
             # in this case, paste(1) will leave such columns empty, i.e. values are the empty string
             BASH_CMD.append(f"<(echo {col_name}_rehab)")
+
+
+    if "other" in parsed_readonly_cols_i.keys():
+        # user specifies column indices as starting with 0,
+        # whereas Unix cut(1) and awk count columns starting with 1
+        for col_i in parsed_readonly_cols_i["other"]:
+            c_i = col_i + 1
+            BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
+
 
     BASH_CMD.append(f">\"{OUTPUT_FILE}\"")
 

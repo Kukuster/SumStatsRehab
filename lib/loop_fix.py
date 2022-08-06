@@ -2,7 +2,7 @@
 import io
 import sys
 import re
-from typing import Dict, Literal, Union
+from typing import Dict, Literal, Union, Tuple
 import os
 import time
 from math import isnan
@@ -21,6 +21,8 @@ from lib.env import GWASSS_BUILD_NUMBER_ENV, get_build, set_build
 def file_exists(path: str):
         return os.path.isfile(path)
 
+def clip_float(val: float, range: Tuple[float, float] = (0, 1)):
+    return min(range[1], max(val, range[0]))
 
 class defaultTrueDict(dict):
     def __missing__(self, key):
@@ -531,7 +533,19 @@ def loop_fix(
                 the_freq_db_i = freqs.index(FREQ_DATABASE_SLUG) # "2"
                 SNP_freqs = freqs[the_freq_db_i+1].split(',') # ["0.9943", "0.005747", "."]
                 allele_i = alleles.index(EA) # 1
+
+                if SNP_freqs[allele_i] in ['.','-','']:
+                    # try inferring from other values
+                    one_minus_all_other_freqs = 1
+                    for i in range(len(SNP_freqs)):
+                        if i == allele_i:
+                            continue
+                        one_minus_all_other_freqs -= float(SNP_freqs[i])
+
+                    SNP_freqs[allele_i] = str( clip_float(one_minus_all_other_freqs,(0,1)) )
+
                 fields[cols_i['EAF']] = SNP_freqs[allele_i]  # "0.005747"
+
             except:
                 fields[cols_i['EAF']] = '.'
 

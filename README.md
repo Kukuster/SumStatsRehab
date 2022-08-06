@@ -62,7 +62,7 @@ pip install git+https://github.com/Kukuster/SumStatsRehab.git
 ```
 or, for specific version:
 ```
-pip install git+https://github.com/Kukuster/SumStatsRehab.git@v1.1.2 --upgrade
+pip install git+https://github.com/Kukuster/SumStatsRehab.git@v1.2.0 --upgrade
 ```
 
 This installation method doesn't work with the currently upcoming git protocol security update on github:
@@ -139,6 +139,7 @@ your config file should have the name `WojcikG_PMID_htn.gz.json` and the followi
     "SE": 10,
     "pval": 11,
     "INFO": 12,
+    "N": 6,
 
     "build": "grch37"
 }
@@ -146,7 +147,7 @@ your config file should have the name `WojcikG_PMID_htn.gz.json` and the followi
 
 Notes:
  - SumStatsRehab will only consider data from the columns which indices are specified in the config file. If one of the above columns is present in the SS file but wasn't specified in the config file, then SumStatsRehab treats the column as missing.
- - In this example, all the 10 columns from the list of supported columns are present. But none of the columns above are mandatory. If certain columns are missing, the `fix` command will attempt to restore them if possible.
+ - In this example, all the 11 columns from the list of supported columns are present. Yet, none of the columns above are mandatory. If certain columns are missing, the `fix` command will attempt to restore them.
 
 
 ### 5. Run the `fix` command
@@ -250,28 +251,49 @@ should be evaluated to an integer: the corresponding column index starting from 
 And 
  - `"build"`
 should be evaluated to either one of the following (case insensitive): `'hg38'`, `'GRCh38'`, `'hg19'`, `'GRCh37'`, `'hg18'`, `'ncbi36'`.
+ - `"other"`
+should be evaluated to an array of integers: indicies of other columns to include
+
 
 It is also possible to set `EAF` to a weighted average of multiple colums. E.g. if there are separate freq. columns for case and control groups, and average freq. is needed, number of participants in each group will serve as weights for the two columns:
-```
+```json
 {
+    ...
     "EAF": {
         "4": 1001,
         "5": 2500
     },
+    ...
 }
 ```
 
 
+During the `fix` command, the input sumstats file may undergo sorting. If you want any other columns to be included in the resulting fixed file, add 0-indexed column indices in an array as the `"other"` parameter in the config.
+
+E.g.:
+```json
+{
+    ...
+    "other": [7, 8, 2],
+    ...
+}
+```
+
+With this entry, the resulting file will have 3 additional columns at the end in the order as their indices appear in this config entry.
+
+
+
 
 ### "standard" format
-When `fix`ing, file is first formatted into this internal format. Output file is also in this format.
+Commands `fix` and `sort` always output files in this format. Internally, input files are always converted before undergoing any processing. `lib/prepare_GWASSS_columns.py` is responsible for formatting the input.
 
  - file is in the tsv format, i.e. tabular tab-separated format (bare, zipped, or gzipped)
  - there's a one-line header in the file on the first line. All other lines are the data entries
- - the file has precisely columns defined as `STANDARD_COLUMN_ORDER` in `lib/standard_column_order.py`.
-    - file has exactly these columns, exactly this number of columns, and no other columns
-    - columns are in this exact order
+ - the file has columns defined as `STANDARD_COLUMN_ORDER` in `lib/standard_column_order.py`.
+    - the file always has these columns
+    - these columns necessarily go first and appear in this order, therefore have exactly these indices
     - if the original file was missing a column, an empty column should be taking its place (entries are *the empty string*)
+ - the file may have any number of any other columns going after the columns defined in the `STANDARD_COLUMN_ORDER`
 
 
 ## Supplementary Information
@@ -296,18 +318,18 @@ Warning: Restored betas with an unknown sign should not be utilized in any downs
 ## BACKLOG
  - **add switches to the `fix` command to turn on and off the restoration of the ambiguous effect alleles (in cases when the dbSNPs present multiple options for ALT)**
  - (maybe) improve restoring alleles by adding checks for an exact match of flipped alleles if other checks didn't help. This requires having all SNPs for a particular ChrBP in the memory and is relevant only for restoring alleles by looping through the file sorted by Chr and BP.
- - add the ability to specify additional columns from the GWAS SS file that the user wants to include in the end file. This would be an array of integers in the json config file for the input GWAS SS file.
  - **improve code in the main file: `SumStatsRehab.py`**
  - improve resolver architecture in `loop_fix.py`: make a separate function loopDB1 and loopDB2 that will loop through enough entries in a DB before every resolver and rewrite a "global" object with properties to be fields from the DB: rsID, Chr, BP, alleles, EAF. So resolvers for rsID and ChrBP will be similar to ones for alleles and EAF. Resolvers for these fields then should operate on `fields` and that object with fields from a DB. This way a really strong optimization, flexibility, and modularity of resolvers will be achieved. `run_all` doesn't have to have resolvers and resolvers_args object to be passed, it can just use the global ones.
  - improve the interface for liftover. SumStatsRehab fix should work for all sorts of liftovers between builds 36, 37, and 38, including back liftover. If the user omits the preprocessed dbSNP databases as input but specifies the chain file, it can perform liftover only.
- - add support for OR, and, maybe, restoration of OR from beta or vice versa.
+ - add support for:
+   - OR, and maybe restoration of OR from beta and vice versa
+   - Z-score, and maybe restoration of z-score from p-value and vice versa
+   - standard deviation, and maybe restoration of std.err., std.dev., and N from each other in accord to the relation
  - add a keyword argument that specifies a temp directory for intermediate files. GWAS SS files are usually 1-4 Gigs unpacked.
- - set alleles column to uppercase during preparation (in `prepare_GWASSS_columns.py` script).
  - feature: save a human-readable textual report about the overall results of restoration (e.g. "performed a liftover, n rsIDs restored, n Chrs lost, ...")
  - at the moment of 2021.11.14, the following executables are assumed to be available in PATH: `bash`, `cut`, `paste`, `sort`, `awk`, `gzip`, `gunzip`, `head`, `tail`, `rm`, `wc`. Need to do more tests of SumStatsRehab with a different versions of `bash`, `awk` (including `gawk`, `nawk`, `mawk`. E.g. even though `gawk` is default for GNU/Linux, Ubuntu has `mawk` by default).
  - **make SumStatsRehab installable via `pip`**
  - Study what is a better approach to restoring EAF from other dbs. Bc for other populations there are not a lot of snps having frequency data. When you try to restore eaf for a more specific populations, it will miss a lot of snps in the ss files, therefore reducing overall accuracy. Idea for workaround: ability to specify multiple dbs, so the each next one in a list will be a lower priority.
  - `diagnose` command script should also generate a bar chart for the bin with missing p-value
  - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
- - **add the following logic for restoring MAF: if the DB specifies allele frequency for all alleles except one (dot '.'), then it should calculated as 1 minus frequency of other alleles instead of leaving a dot**
  - add feature: `amputate` command. Runs `diagnosis` and removes all the invalid rows.
