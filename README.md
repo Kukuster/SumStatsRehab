@@ -333,3 +333,9 @@ Warning: Restored betas with an unknown sign should not be utilized in any downs
  - `diagnose` command script should also generate a bar chart for the bin with missing p-value
  - **add data to the csv report of issues: rsID, rsID_restorable, Chr, Chr_restorable, ... etc. Use this report in the FIX command when deciding on the workflow.**
  - add feature: `amputate` command. Runs `diagnosis` and removes all the invalid rows.
+ - improve try & catch clauses in `lib/loop_fix.py`: it has to catch speicifc Exceptions everywhere
+ - catch KeyboardInterrupt exception in main, and, first, don't show the python traceback, second, call some kind of "destruct method", removing temp files. E.g. if for the `fix` command `--verbose` key was not set, then remove the intermediate files.
+ - catch JSONDecodeError exception and provide a message with something like "sorry your config file is not a valid json", and provide a link to the github or the JSON docs
+ - catch exceptions raise because of other wrong user input, e.g. wrong `gz-sort` or `bcftools` executable.
+ - change the `fix` command interface: if `--verbose` is set, then forbid the `--OUTPUT` argument and allow `--OUTPUT-PREFIX`.
+ - add feature: if the `fix` command was not set to `--verbose`, then if the `--OUTPUT` path ends with `.gz` or `.zip`, then compress the resulting file on the output.

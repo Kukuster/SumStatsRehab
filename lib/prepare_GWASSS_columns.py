@@ -142,8 +142,8 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
             # if this is an allele column, make all letters uppercase
             if col_name == 'Chr':
                 chrom_col_fd = f"<( "
-                chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
-                chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' ; "
+                chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} | sed -e 's/\r$//' ; "
+                chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{if (tolower(${c_i}) ~ /^chr/) {{print substr(${c_i},4)}} else {{print ${c_i}}} }}' | sed -e 's/\r$//' ; "
                 chrom_col_fd += f" )"
                 BASH_CMD.append(chrom_col_fd)
             elif col_name == 'BP':
@@ -159,17 +159,18 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
                     }} else {{
                         print ${c_i}
                     }}
-                }}' ; """
+                }}' | """
+                bp_col_fd += f" sed -e 's/\r$//' "
                 bp_col_fd += f" )"
                 BASH_CMD.append(bp_col_fd)
             elif col_name in ['OA', 'EA']:
                 chrom_col_fd = f"<( "
-                chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} ; "
-                chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{print toupper(${c_i})}}' ; "
+                chrom_col_fd += f"head -n 1 \"{BARE_GWAS_FILE}\" | cut -d$'\\t' -f{c_i} | sed -e 's/\r$//' ; "
+                chrom_col_fd += f"tail -n +2 \"{BARE_GWAS_FILE}\" | awk -F $'\\t' '{{print toupper(${c_i})}}' | sed -e 's/\r$//' ; "
                 chrom_col_fd += f" )"
                 BASH_CMD.append(chrom_col_fd)
             else:
-                BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\")")
+                BASH_CMD.append(f"<(cut -d$'\\t' -f{c_i} \"{BARE_GWAS_FILE}\" | sed -e 's/\r$//')")
 
         elif col_name in parsed_cols_i_with_avg.keys():
             cols_obj = parsed_cols_i_with_avg[col_name]
@@ -184,13 +185,13 @@ def prepare_GWASSS_columns(INPUT_GWAS_FILE: str, OUTPUT_FILE: str):
             shifted_cols_obj: OrderedDict[int, float] = OrderedDict({})
             for col_i, weight in cols_obj.items():
                 shifted_cols_obj[col_i+1] = weight
-            
+
             col_indices_for_cut = ",".join(map(str, shifted_cols_obj.keys()))
             col_weights_for_awk = " ".join(map(str, shifted_cols_obj.values()))
-            
+
             avg_col_df = f"<( "
             avg_col_df += f"""echo {col_name}_rehab ;
-            tail -n +2 \"{BARE_GWAS_FILE}\" | cut -d$'\t' -f{col_indices_for_cut} | \\
+            tail -n +2 \"{BARE_GWAS_FILE}\" | cut -d$'\t' -f{col_indices_for_cut} | sed -e 's/\r//' | \\
                 awk -F$'\t' '
                     {awk_function_o_class}
                     BEGIN{{

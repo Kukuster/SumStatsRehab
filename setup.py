@@ -1,16 +1,18 @@
 import sys
 from setuptools import setup
 
-if sys.version_info < (3, 7):
-    print("WARNING: Python 3.7 or newer is recommended. If you encounter bugs, try updating python")
+if sys.version_info < (3, 8):
+    print("WARNING: Python 3.8 or newer is highly recommended. If you encounter errors, try updating python")
 
 install_requires = [
-    "numpy==1.20.1",
-    "matplotlib==3.3.4",
+    "cython>=0.29.30, <3.0.0",
+    "numpy>=1.20.1",
+    "matplotlib>=3.3.4",
     "scipy==1.6.1",
-    "liftover==1.1.11",
+    "liftover==1.1.13",
     "python-magic==0.4.24",
-    "requests==2.22.0",
+    "requests>=2.22.0",
+    "tqdm>=4.60.0, <5.0.0",
 ]
 
 classifiers = """
@@ -26,7 +28,7 @@ Topic :: Scientific/Engineering :: Bio-Informatics
 if __name__ == "__main__":
     setup(
         name="SumStatsRehab",
-        version="1.2.0",
+        version="1.2.1",
         description="GWAS summary statistics files QC tool",
         url="https://github.com/Kukuster/SumStatsRehab",
         license="MIT",

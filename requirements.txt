@@ -1,6 +1,8 @@
-numpy==1.20.1
-matplotlib==3.3.4
+cython>=0.29.30, <3.0.0
+numpy>=1.20.1
+matplotlib>=3.3.4, <3.6.0
 scipy==1.6.1
-liftover==1.1.11
+liftover==1.1.13
 python-magic==0.4.24
-requests==2.22.0
+requests>=2.22.0
+tqdm>=4.60.0, <5.0.0

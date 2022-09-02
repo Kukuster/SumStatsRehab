@@ -10,6 +10,7 @@ import gzip
 
 # third-party libraries
 from liftover import ChainFile as get_lifter_from_ChainFile # type: ignore # pylance mistakenly doesn't recognize ChainFile
+from tqdm import tqdm
 
 # local
 from lib.math_utils import normal_p_area_two_tailed, normal_z_score_two_tailed
@@ -812,11 +813,17 @@ def loop_fix(
     # copy the first line that is the header
     line_i = copy_line(line_i)
 
+    if DOING_LIFTOVER:
+        pbar_desc = '    lifting over   '
+    else:
+        pbar_desc = '     loop-fix      '
+    pbar = tqdm(total=total_entries, desc=pbar_desc)
     try:
         while True:
             fields = get_next_line_in_GWASSS()
             run_all(resolvers, fields, resolvers_args)
             write_line_to_GWASSS(fields)
+            pbar.update(1)
 
     except Exception as e:
         if isinstance(e, IndexError) or isinstance(e, EOFError):
@@ -825,7 +832,8 @@ def loop_fix(
         else:
             print(f'An error occured on line {line_i} of the GWAS SS file (see below)')
             raise e
-    
+    pbar.close()
+
 
     GWAS_FILE_o.close()
     OUTPUT_GWAS_FILE_o.close()

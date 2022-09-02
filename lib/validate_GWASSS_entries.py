@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import magic
+from tqdm import tqdm
 
 # local
 from lib.utils import run_bash
@@ -391,16 +392,18 @@ def validate_GWASSS_entries(
     GWAS_FILE_o.readline()
     line_i+=1
 
-    SNPs_pval = np.empty(num_of_snps, dtype=float)
-    SNPs_report = np.empty(num_of_snps, dtype=int)
-    SNPs_issues = np.empty((num_of_snps, len(ISSUES)), dtype=bool)
+    SNPs_pval = np.zeros(num_of_snps, dtype=np.float64)
+    SNPs_report = np.zeros(num_of_snps, dtype=np.int8)
+    SNPs_issues = np.zeros((num_of_snps, len(ISSUES)), dtype=np.bool_)
 
     ### populate the allocated array with report for each SNP as well as its p-value ###
+    pbar = tqdm(total=num_of_snps, desc="validating entries ")
     try:
         snp_i = 0
         while True:
             SNPs_pval[snp_i], SNPs_report[snp_i], SNPs_issues[snp_i] = check_row(GWAS_FILE_o.readline().replace('\n','').split(separator))
             snp_i += 1
+            pbar.update(1)
 
     except Exception as e:
         if isinstance(e, IndexError) or isinstance(e, EOFError):
@@ -409,12 +412,12 @@ def validate_GWASSS_entries(
         else:
             print(f'An error occured on line {line_i} of the GWAS SS file (see below)')
             raise e
+    pbar.close()
     ### ###
 
 
     GWAS_FILE_o.close()
     # print("--- STEP1: %s seconds ---" % (time.time() - STEP1_start_time))
-    print("finished measurements, calculating reports")
 
     # result: SNPs_report, SNPs_pval
 
@@ -487,6 +490,7 @@ def validate_GWASSS_entries(
     # besides total, for each of the bin we'll store the number of invalid entries for each type
     invalid_entry_bins_reason_bins = np.zeros((len(ticks), max(ISSUES)+1)).astype(int)
 
+    pbar = tqdm(total=len(SNPs_report), desc="calculating reports")
     for line_i in range(len(SNPs_report)):
 
         if SNPs_report[line_i] == MISSING_P_VALUE:
@@ -505,11 +509,14 @@ def validate_GWASSS_entries(
                     invalid_entry_bins_reason_bins[j] += SNPs_issues[line_i]
                     break
 
+        pbar.update(1)
+    pbar.close()
+
     ### ###
 
     # print("--- STEP2: %s seconds ---" % (time.time() - STEP2_start_time))
     # print("=== MAIN: %s seconds ===" % (time.time() - MAIN_start_time)) # plotting doesn't count
-    print("calculated reports")
+    print("generating reports")
 
 
 
@@ -687,7 +694,6 @@ def validate_GWASSS_entries(
             ax.bar(ISSUES_LABELS, height=invalid_entry_bins_reason_bins[i], width=1, color=ISSUES_COLORS)
 
         if REPORT_ABS_DIR: plot_i.savefig(os.path.join(REPORT_ABS_DIR, image_name+'.png'))
-
 
 
 
